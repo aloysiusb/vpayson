@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Virginia P. Payson — Web Design &amp; Development, Roaring Fork Valley</title>
+<meta name="description" content="Independent web design and development in Basalt, Colorado. Fast, accessible, maintainable websites for mountain-town businesses, nonprofits and destinations. Building in the Roaring Fork Valley since 2002.">
+<link rel="canonical" href="https://vpayson.com/">
+<meta property="og:title" content="Virginia P. Payson — Web Design &amp; Development">
+<meta property="og:description" content="Independent web design and development in Basalt, Colorado. Building in the Roaring Fork Valley since 2002.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://vpayson.com/">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%231f5c47'/><text y='.72em' x='50%25' text-anchor='middle' font-size='62' font-family='system-ui' fill='%23fff'>V</text></svg>">
+
+<style>
+/* ────────────────────────────────────────────────────────────────
+   DESIGN TOKENS — edit these, and nothing else, to restyle the page
+   ──────────────────────────────────────────────────────────────── */
+:root{
+  /* Brand hue drives the whole palette. Change this one number. */
+  --hue: 158;
+  --chroma: .06;
+
+  --ink:        oklch(22% .02 var(--hue));
+  --ink-soft:   oklch(42% .015 var(--hue));
+  --ink-faint:  oklch(58% .012 var(--hue));
+  --paper:      oklch(99% .004 var(--hue));
+  --paper-alt:  oklch(96.5% .008 var(--hue));
+  --rule:       oklch(89% .012 var(--hue));
+  --brand:      oklch(43% var(--chroma) var(--hue));
+  --brand-soft: oklch(95% .022 var(--hue));
+  --accent:     oklch(55% .13 48);
+
+  --measure: 34rem;
+  --gutter: clamp(1.25rem, 5vw, 4rem);
+  --shell: 62rem;
+
+  --step--1: clamp(.82rem, .79rem + .14vw, .89rem);
+  --step-0:  clamp(1rem, .96rem + .2vw, 1.09rem);
+  --step-1:  clamp(1.2rem, 1.12rem + .4vw, 1.45rem);
+  --step-2:  clamp(1.55rem, 1.36rem + .95vw, 2.15rem);
+  --step-3:  clamp(2.1rem, 1.6rem + 2.5vw, 3.6rem);
+
+  --font: "Google Sans Flex", "Google Sans", ui-sans-serif, system-ui,
+          -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:        oklch(93% .012 var(--hue));
+    --ink-soft:   oklch(75% .014 var(--hue));
+    --ink-faint:  oklch(60% .012 var(--hue));
+    --paper:      oklch(17% .014 var(--hue));
+    --paper-alt:  oklch(21% .018 var(--hue));
+    --rule:       oklch(30% .018 var(--hue));
+    --brand:      oklch(78% .09 var(--hue));
+    --brand-soft: oklch(26% .03 var(--hue));
+    --accent:     oklch(72% .12 48);
+  }
+}
+
+/* ──────────────────────────────  BASE  ────────────────────────── */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--font); font-size:var(--step-0); line-height:1.6;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+h1,h2,h3{line-height:1.12; margin:0; font-weight:600; letter-spacing:-.02em; text-wrap:balance}
+p{margin:0; text-wrap:pretty}
+a{color:inherit}
+:focus-visible{outline:2.5px solid var(--accent); outline-offset:3px; border-radius:2px}
+
+.shell{max-width:var(--shell); margin-inline:auto; padding-inline:var(--gutter)}
+
+/* ──────────────────────────────  HERO  ────────────────────────── */
+.hero{padding-block:clamp(4rem,14vh,8.5rem) clamp(3rem,9vh,5.5rem)}
+.eyebrow{
+  font-size:var(--step--1); font-weight:600; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--brand); margin:0 0 1.4rem;
+}
+.hero h1{font-size:var(--step-3); max-width:16ch}
+.hero h1 .quiet{color:var(--ink-faint); font-weight:400; display:block; letter-spacing:-.015em}
+.lede{font-size:var(--step-1); color:var(--ink-soft); max-width:var(--measure); margin-block-start:1.6rem}
+.hero-meta{
+  display:flex; flex-wrap:wrap; gap:.5rem 1.6rem; margin-block-start:2.2rem;
+  font-size:var(--step--1); color:var(--ink-faint);
+}
+.hero-meta strong{color:var(--ink-soft); font-weight:500}
+
+/* phi bars — proportions from the golden ratio, purely decorative */
+.phi{display:flex; gap:.4rem; margin-block-start:2.6rem; height:.4rem}
+.phi span{background:var(--brand); border-radius:99px}
+.phi span:nth-child(1){flex:1.618}
+.phi span:nth-child(2){flex:1; opacity:.6}
+.phi span:nth-child(3){flex:.618; opacity:.4}
+.phi span:nth-child(4){flex:.382; opacity:.25}
+.phi span:nth-child(5){flex:.236; opacity:.15}
+
+/* ─────────────────────────────  SECTIONS  ─────────────────────── */
+section{padding-block:clamp(2.75rem,7vh,4.5rem)}
+.band{background:var(--paper-alt); border-block:1px solid var(--rule)}
+.section-head{
+  font-size:var(--step--1); font-weight:600; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-faint); margin:0 0 2rem;
+}
+
+/* ──────────────────────────────  WORK  ────────────────────────── */
+.work{display:grid; border-block-start:1px solid var(--rule)}
+.item{
+  display:grid; gap:.15rem .5rem; padding-block:1.35rem;
+  border-block-end:1px solid var(--rule);
+  grid-template-columns:1fr auto; align-items:baseline;
+  text-decoration:none; transition:background .18s ease, padding .18s ease;
+}
+.item:hover,.item:focus-visible{background:var(--brand-soft); padding-inline:.9rem}
+.item h3{font-size:var(--step-1); grid-column:1}
+.item .where{
+  grid-column:2; font-size:var(--step--1); color:var(--ink-faint);
+  white-space:nowrap;
+}
+.item p{grid-column:1 / -1; color:var(--ink-soft); font-size:var(--step--1); max-width:52ch; margin-block-start:.3rem}
+.item .go{color:var(--brand); font-weight:600}
+
+/* ────────────────────────────  APPROACH  ──────────────────────── */
+.cards{display:grid; gap:1.75rem; grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))}
+.card h3{font-size:var(--step-0); margin-block-end:.5rem}
+.card p{color:var(--ink-soft); font-size:var(--step--1)}
+.card .mark{
+  display:block; width:2rem; height:2px; background:var(--brand);
+  margin-block-end:1rem; border-radius:99px;
+}
+
+/* ────────────────────────────  CONTACT  ───────────────────────── */
+.contact h2{font-size:var(--step-2); max-width:18ch}
+.contact-links{
+  display:flex; flex-wrap:wrap; gap:.75rem 2rem; margin-block-start:1.75rem;
+  font-size:var(--step-1);
+}
+.contact-links a{
+  color:var(--brand); font-weight:500; text-decoration-thickness:1px;
+  text-underline-offset:.22em;
+}
+.contact-links a:hover{color:var(--accent)}
+
+footer{
+  padding-block:2.25rem 3rem; border-block-start:1px solid var(--rule);
+  font-size:var(--step--1); color:var(--ink-faint);
+  display:flex; flex-wrap:wrap; gap:.4rem 1.5rem; justify-content:space-between;
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation:none !important; transition:none !important}
+}
+</style>
+</head>
+<body>
+
+<main>
+
+  <header class="hero shell">
+    <p class="eyebrow">Basalt, Colorado</p>
+    <h1>Virginia P. Payson<span class="quiet">Web design &amp; development</span></h1>
+    <p class="lede">
+      Independent designer and developer. I build fast, accessible, genuinely
+      maintainable websites — and I have been doing it in the Roaring Fork
+      Valley since 2002.
+    </p>
+    <div class="hero-meta">
+      <span><strong>24 years</strong> in this valley</span>
+      <span><strong>50+</strong> custom WordPress builds</span>
+      <span><strong>RISD</strong>-trained designer who writes the backend</span>
+    </div>
+    <div class="phi" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+  </header>
+
+  <section class="band">
+    <div class="shell">
+      <h2 class="section-head">Selected work</h2>
+      <div class="work">
+
+        <a class="item" href="https://www.frippislandresort.com">
+          <h3>Fripp Island Golf &amp; Beach Resort</h3>
+          <span class="where">Destination &middot; <span class="go">Visit &rarr;</span></span>
+          <p>A private-island resort: 100+ rental properties, ten restaurants, two golf
+             courses and a full reservation engine. Lodging, dining, recreation and
+             events served from one site.</p>
+        </a>
+
+        <a class="item" href="https://cracksandracks.com/">
+          <h3>Cracks &amp; Racks</h3>
+          <span class="where">Aspen &middot; <span class="go">Visit &rarr;</span></span>
+          <p>Full store migration off end-of-life Magento 1 onto Magento 2, with the
+             storefront rebuilt rather than ported — catalog, appointment scheduling
+             and service content in one usable whole.</p>
+        </a>
+
+        <a class="item" href="https://www.aspenideas.org/">
+          <h3>Aspen Ideas Festival</h3>
+          <span class="where">Aspen Institute &middot; <span class="go">Visit &rarr;</span></span>
+          <p>Custom pages and feed integrations behind a multi-track event platform —
+             podcast and video feeds parsed into the CMS, schedule pulled from the
+             internal database, plus the newsletters and the Festival app.</p>
+        </a>
+
+        <a class="item" href="https://carolynnheilinteriors.com/CH-index">
+          <h3>Carolynn Heil Interiors</h3>
+          <span class="where">Aspen &middot; <span class="go">Visit &rarr;</span></span>
+          <p>Vanilla HTML, CSS and JavaScript on golden-ratio proportions and an OKLCH
+             colour system — with a style panel that lets the client re-tone the whole
+             site herself.</p>
+        </a>
+
+        <a class="item" href="https://earlymusicsa.org/">
+          <h3>Early Music San Antonio</h3>
+          <span class="where">Nonprofit &middot; <span class="go">Visit &rarr;</span></span>
+          <p>Season calendar, concert pages and ticketing for a volunteer-run arts
+             nonprofit — currently migrating 419 events off WordPress and a costly
+             licensed plugin onto something maintainable.</p>
+        </a>
+
+        <a class="item" href="https://homeranch.com/">
+          <h3>The Home Ranch</h3>
+          <span class="where">Clark, Colorado &middot; <span class="go">Visit &rarr;</span></span>
+          <p>A 3,000-acre Colorado guest ranch — lodging, dining, experiences and
+             private events for a property that has to sell a place, not just
+             describe one.</p>
+        </a>
+
+      </div>
+    </div>
+  </section>
+
+  <section class="shell">
+    <h2 class="section-head">How I work</h2>
+    <div class="cards">
+      <div class="card">
+        <span class="mark" aria-hidden="true"></span>
+        <h3>HTML and CSS first</h3>
+        <p>Structure and styling in markup, JavaScript only where it genuinely adds
+           behaviour. Lightweight sites stay fast, and they stay maintainable long
+           after launch.</p>
+      </div>
+      <div class="card">
+        <span class="mark" aria-hidden="true"></span>
+        <h3>Accessible by construction</h3>
+        <p>WCAG 2.1 AA built in from the design stage — real contrast, real keyboard
+           support, real screen-reader testing. Never an overlay widget.</p>
+      </div>
+      <div class="card">
+        <span class="mark" aria-hidden="true"></span>
+        <h3>Built to hand over</h3>
+        <p>No proprietary framework, no page-builder lock-in. You own the code, the
+           accounts and the documentation — so you are never stuck with any one
+           developer, including me.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band contact">
+    <div class="shell">
+      <h2>Have a project in the valley?</h2>
+      <p class="lede">Happy to talk it through — no pitch, no obligation.</p>
+      <div class="contact-links">
+        <a href="mailto:v.p.payson@gmail.com">v.p.payson@gmail.com</a>
+        <a href="tel:+19704566884">(970) 456-6884</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="shell">
+  <span>&copy; <span id="y">2026</span> Virginia P. Payson &middot; Basalt, Colorado</span>
+  <span>Built by hand, no framework.</span>
+</footer>
+
+<script>document.getElementById('y').textContent=new Date().getFullYear()</script>
+</body>
+</html>

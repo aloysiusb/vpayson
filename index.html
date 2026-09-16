@@ -149,6 +149,7 @@ footer{
   font-size:var(--step--1); color:var(--ink-faint);
   display:flex; flex-wrap:wrap; gap:.4rem 1.5rem; justify-content:space-between;
 }
+footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickness:1px}
 
 @media (prefers-reduced-motion: reduce){
   *{animation:none !important; transition:none !important}
@@ -194,7 +195,7 @@ footer{
           <h3>Carolynn Heil Interiors</h3>
           <span class="where">Aspen &middot; <span class="go">Visit &rarr;</span></span>
           <p>Vanilla HTML, CSS and JavaScript on golden-ratio proportions and an OKLCH
-             colour system — with a style panel that lets the client re-tone the whole
+             color system — with a style panel that lets the client re-tone the whole
              site herself.</p>
         </a>
 
@@ -275,7 +276,7 @@ footer{
 
 <footer class="shell">
   <span>&copy; <span id="y">2026</span> Virginia P. Payson &middot; Basalt, Colorado</span>
-  <span>Built by hand, no framework.</span>
+  <span><a href="palette/">Color tools</a> &middot; Built by hand, no framework.</span>
 </footer>
 
 <script>document.getElementById('y').textContent=new Date().getFullYear()</script>

@@ -152,15 +152,6 @@ section{padding-block:clamp(2.75rem,7vh,4.5rem)}
 
 /* Confidential work: described, never linked. No hover affordance, because
    there is nothing to click and pretending otherwise would be annoying. */
-/* Confidential work sits in the same grid as the rest, but is a div, not a
-   link — there is nothing to click and a hover lift would promise otherwise. */
-.app-private{cursor:default; border-style:dashed}
-.app-private:hover{transform:none; border-color:var(--rule)}
-.app-private .tag{color:var(--ink-faint)}
-.app-private .why{
-  margin-block-start:.4rem; font-size:var(--step--1); color:var(--ink-faint);
-  border-inline-start:2px solid var(--rule); padding-inline-start:.8rem;
-}
 
 /* ────────────────────────────  APPROACH  ──────────────────────── */
 .cards{display:grid; gap:1.75rem; grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))}
@@ -266,25 +257,34 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
         <span class="cta">Change the colours &rarr;</span>
       </a>
 
-      <div class="app app-private">
-        <span class="tag">Confidential &middot; described, not linked</span>
-        <h3>Case documentation walls &mdash; BAM, the Lemmon Dociere</h3>
-        <p>Investigative and legal case systems: a visual wall where documents,
-           people, events and the connections between them are laid out,
-           annotated and re-arranged as a matter develops. One documented
-           architecture redeployed per case rather than rebuilt each time.</p>
-        <p>Each wall carries its own admin — a password-gated settings service
-           in plain Node with <b>no dependencies whatsoever</b>, using only
-           Node's own HTTP, SQLite and crypto modules. Every change is written
-           to a history table rather than over the previous value, so nothing is
-           silently lost and any edit can be walked back. Authentication is a
-           timing-safe comparison, and settings are namespaced per wall so one
-           service backs many.</p>
+      <a class="app" href="https://the-lemmon-dociere.onrender.com/">
+        <span class="tag">Documentation system</span>
+        <h3>Case documentation walls</h3>
+        <p>Built for the parties to two matters, working entirely from
+           public-record material: a visual wall where documents, people, events
+           and the connections between them are laid out, annotated and
+           re-arranged as the record grows. One documented architecture,
+           redeployed per case rather than rebuilt each time.</p>
+        <p>Each wall carries its own admin — a settings service in plain Node
+           with <b>no dependencies whatsoever</b>, using only Node's own HTTP,
+           SQLite and crypto modules. Every change is written to a history table
+           rather than over the previous value, so nothing is silently lost and
+           any edit can be walked back. Authentication is a timing-safe
+           comparison, and settings are namespaced per wall so one service backs
+           many.</p>
         <span class="stack">Node &middot; SQLite &middot; zero npm dependencies &middot; versioned history</span>
-        <p class="why">No link, by design. These document real people who never
-           agreed to appear in a portfolio and cannot be asked. Happy to walk
-           through the architecture.</p>
-      </div>
+        <span class="cta">The Lemmon Dociere &rarr;</span>
+      </a>
+
+      <a class="app" href="https://bam-wall.onrender.com/">
+        <span class="tag">Documentation system</span>
+        <h3>The BAM wall</h3>
+        <p>The same engine on a second matter — the architecture above,
+           redeployed rather than rewritten, which is the whole argument for
+           having built it as a template in the first place.</p>
+        <span class="stack">Node &middot; SQLite &middot; same core, separate deployment</span>
+        <span class="cta">Open the wall &rarr;</span>
+      </a>
 
       <a class="app" href="https://cymatic-decoder.onrender.com/">
         <span class="tag">Experiment</span>

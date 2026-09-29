@@ -21,6 +21,9 @@ header {
 .brand h1 { font-size: 14px; font-weight: 700; color: #fff; white-space: nowrap; }
 .brand span { font-size: 12px; color: #555; margin-left: 8px; }
 .hdr-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.brand-nav { font-size: 11px; opacity: .55; margin-top: 3px; }
+.brand-nav a { color: inherit; text-underline-offset: .2em; }
+.brand-nav a:hover { opacity: 1; }
 
 /* ── Buttons ── */
 button {
@@ -244,6 +247,12 @@ button.export-btn:hover { background: rgba(80,160,255,0.2); }
 <header>
   <div class="brand">
     <h1>Golden Section Palette <span>φ · OKLCH</span></h1>
+    <!-- This page had no way out: the wheel links here, but nothing linked
+         back to it or to the portfolio it is shown from. -->
+    <nav class="brand-nav">
+      <a href="index.html">Colour Theory Wheel</a> ·
+      <a href="/">Virginia P. Payson</a>
+    </nav>
   </div>
   <div class="hdr-right">
     <div class="hue-wrap">

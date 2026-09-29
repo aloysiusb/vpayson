@@ -237,16 +237,29 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
         <span class="cta">Three live demos — driver's phone, route map, office board &rarr;</span>
       </a>
 
-      <a class="app" href="palette/">
+      <a class="app" href="palette/palette.html">
         <span class="tag">Design tool</span>
         <h3>Golden Section Palette</h3>
-        <p>A colour wheel and a palette generator built on the OKLCH colour
-           space, where perceptual lightness is even across hues — so a palette
-           holds its contrast ratios on every pairing instead of passing on some
-           and quietly failing on others. Exports straight to CSS custom
-           properties.</p>
-        <span class="stack">OKLCH &middot; golden-ratio harmonies &middot; no dependencies</span>
-        <span class="cta">Open the tool &rarr;</span>
+        <p>A palette generator built on the OKLCH colour space, where
+           perceptual lightness is even across hues — so a palette holds its
+           contrast ratios on every pairing instead of passing on some and
+           quietly failing on others. Harmonies are spaced on golden-ratio
+           relationships, and a <b>golden spiral draws itself in the current
+           palette</b> to show the ratio doing the work. Exports straight to
+           CSS custom properties.</p>
+        <span class="stack">OKLCH &middot; φ harmonies &middot; animated SVG &middot; no dependencies</span>
+        <span class="cta">Open the generator &rarr;</span>
+      </a>
+
+      <a class="app" href="palette/">
+        <span class="tag">Design tool</span>
+        <h3>Colour Theory Wheel</h3>
+        <p>The companion: an interactive wheel for picking a base hue and seeing
+           the classic harmonies — complementary, split, triadic, analogous —
+           laid out against it, drawn on canvas and computed in the same colour
+           space as the generator.</p>
+        <span class="stack">Canvas &middot; OKLCH &middot; no dependencies</span>
+        <span class="cta">Open the wheel &rarr;</span>
       </a>
 
       <a class="app" href="https://carolynn-heil.onrender.com/settings.html">
@@ -399,7 +412,7 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
 
 <footer class="shell">
   <span>&copy; <span id="y">2026</span> Virginia P. Payson &middot; Basalt, Colorado</span>
-  <span><a href="palette/">Color tools</a> &middot; Built by hand, no framework.</span>
+  <span><a href="palette/palette.html">Color tools</a> &middot; Built by hand, no framework.</span>
 </footer>
 
 <script>document.getElementById('y').textContent=new Date().getFullYear()</script>

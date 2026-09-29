@@ -1,7 +1,50 @@
-# vpayson.com — splash site
+# vpayson.com
 
-Single-page site for Virginia P. Payson, Basalt CO. One file, no build step,
-no dependencies, no framework.
+Portfolio site for Virginia P. Payson, Basalt CO. No build step, no
+dependencies, no framework. Auto-deploys to Render on every push to `main`.
+
+```
+index.html                       home — Applications, then Selected work
+palette/                         Color Theory Wheel + Golden Section Palette
+work/evergreen/index.html        route driver app — case study
+work/evergreen/walkthrough.html  the interactive demo
+work/evergreen/css/              copied from the app, so the demo looks right
+```
+
+## The Evergreen demo is a deliberate copy, not a link
+
+`work/evergreen/walkthrough.html` was copied out of the `evergreen-driver-app`
+repo rather than linked to the running service, and **it makes zero network
+calls** — no `fetch`, no WebSocket, no Maps key. Keep it that way. The reasons:
+
+- Linking would publish the client's production hostname to every visitor.
+- A deploy on the client's service can't change what this page shows.
+- It keeps working after the engagement ends, or if that service is deleted.
+
+Every customer, address, note and gate code in it is invented, and the intro
+says so. The original used real streets and named real Carbondale developments,
+which was fine internally and wrong for a public page — if you ever re-copy the
+file from the app, redo that sanitisation.
+
+## Open items
+
+- [ ] **Name the client in the case study.** It currently says "a compost and
+      waste hauler" rather than Evergreen ZeroWaste, pending Alyssa's sign-off
+      on public credit. One-line change in `work/evergreen/index.html` once she
+      agrees — and worth doing, the environmental angle is the point.
+- [ ] **`ACCESS_CODE` / `ADMIN_CODE` on the driver app.** Unrelated to this repo
+      but blocking the above: both are unset in Render, so `gate.js` skips the
+      gate entirely and real route data is readable by anyone with the
+      hostname. Fix before crediting the client publicly. Drivers will each
+      need the `?c=CODE` link once, so time it with Alyssa, not mid-route.
+- [ ] **`sundancefirearms` and `carolynn-heil`** — both deployed 2026-09-25.
+      Add to Selected work if they are launched and the clients are happy.
+- [ ] **RISD** is deliberately not cited in the hero strip for now. The original
+      wording is in an HTML comment there if it should go back.
+
+Not for public listing: the investigative wall projects (BAM, Apostasy, the
+Lemmon docket, the case reference tracker). Confidential case documentation —
+describe the capability if useful, but do not link them.
 
 ## Deploying to Render
 
@@ -28,9 +71,8 @@ At your registrar (currently resolving to 162.241.253.117 — Bluehost/Unified L
 Render issues the TLS certificate automatically once DNS resolves. Propagation
 is usually minutes, occasionally up to a few hours.
 
-**Note:** vpayson.com currently serves the Golden Section Palette tool. Move that
-to a subpath (e.g. `/palette`) or its own subdomain before repointing the domain,
-so it isn't lost.
+*(Done: the palette tool was moved to `/palette` so the domain could be
+repointed without losing it.)*
 
 ## Editing
 
@@ -45,14 +87,14 @@ Light and dark palettes are both defined; dark follows the visitor's OS setting.
 
 Content is plain semantic HTML below the `<style>` block — edit the text directly.
 
-## Creating the GitHub repo
+`work/evergreen/index.html` repeats the same `:root` token block on purpose, so
+each page stands alone as one file. If the hue changes, change it in both.
+
+## Deploying a change
 
 ```bash
-cd vpayson-splash
-git init -b main
-git add .
-git commit -m "Splash site for vpayson.com"
-gh repo create vpayson-site --private --source=. --push
+git add -A && git commit -m "…" && git push
 ```
 
-Swap `--private` for `--public` if you'd rather it be open.
+Render rebuilds on the commit. A static site of this size is live in under a
+minute; there is nothing to run locally beyond opening the file in a browser.

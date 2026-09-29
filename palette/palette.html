@@ -145,6 +145,48 @@ button.export-btn:hover { background: rgba(80,160,255,0.2); }
 }
 .palette-strip .strip-sw { flex: 1; }
 
+/* ── Golden spiral ─────────────────────────────────────────────────────
+   Every arc is its own path so each can carry a palette colour. The draw
+   is a dash-offset transition per path with a staggered delay set inline,
+   so the animation is CSS doing the work — nothing is animated frame by
+   frame in JavaScript. */
+.spiral-wrap {
+  border-radius: 10px; overflow: hidden; padding: 18px;
+  background: rgba(0,0,0,0.22);
+  box-shadow: 0 3px 18px rgba(0,0,0,0.45);
+}
+.spiral-wrap svg { display: block; width: 100%; height: auto; }
+
+#spiral .rect {
+  fill: none; stroke: currentColor; stroke-width: 1;
+  opacity: 0; transition: opacity .5s ease;
+}
+#spiral .arc {
+  fill: none; stroke-linecap: round; stroke-width: 7;
+  stroke-dasharray: var(--len); stroke-dashoffset: var(--len);
+  transition: stroke-dashoffset .62s cubic-bezier(.35,0,.25,1),
+              stroke .35s ease;
+}
+#spiral.drawn .arc  { stroke-dashoffset: 0; }
+#spiral.drawn .rect { opacity: .16; }
+
+.spiral-replay {
+  float: right; font: inherit; font-size: 11px; cursor: pointer;
+  background: rgba(255,255,255,.07); color: inherit;
+  border: 1px solid rgba(255,255,255,.14); border-radius: 6px;
+  padding: 2px 9px;
+}
+.spiral-replay:hover { background: rgba(255,255,255,.14); }
+
+.spiral-note { font-size: 12px; opacity: .62; margin: 10px 2px 0; line-height: 1.55; }
+.spiral-note b { font-style: italic; opacity: .95; }
+
+/* An animation that draws itself is the whole point, so when motion is
+   unwelcome the figure simply arrives complete rather than not at all. */
+@media (prefers-reduced-motion: reduce) {
+  #spiral .arc, #spiral .rect { transition: none; }
+}
+
 /* Swatch cards */
 .swatch-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px;
@@ -241,6 +283,26 @@ button.export-btn:hover { background: rgba(80,160,255,0.2); }
     <div>
       <div class="section-label">Full palette strip — hover to expand · click to copy</div>
       <div class="palette-strip" id="mainStrip"></div>
+    </div>
+
+    <!-- ── Golden spiral ──────────────────────────────────────────────
+         The same φ that spaces the palette, drawn. Each quarter-turn arc
+         is tinted from a swatch, so the figure re-tones whenever the
+         palette does — it is the palette, not decoration beside it. -->
+    <div>
+      <div class="section-label">
+        The golden section, drawn
+        <button class="spiral-replay" id="spiralReplay" type="button">↻ Replay</button>
+      </div>
+      <div class="spiral-wrap">
+        <svg id="spiral" viewBox="0 0 620 387" role="img"
+             aria-label="A golden spiral drawn through subdividing golden rectangles, each arc coloured from the current palette."></svg>
+      </div>
+      <p class="spiral-note">
+        Each square is <b>φ</b> times smaller than the last — 377, 233, 144, 89,
+        55, 34, 21 — and the arc across it is a quarter turn. The same ratio
+        spaces the lightness steps in the palette above.
+      </p>
     </div>
 
     <div id="groupsArea">
@@ -453,6 +515,102 @@ function render() {
   renderGroups();
   renderSwatches();
   renderCSS();
+  renderSpiral();
+}
+
+// ── Golden spiral ───────────────────────────────────────────────────────
+/* The construction, rather than a formula: take a golden rectangle, cut the
+   largest square off one end, and what is left is a golden rectangle again,
+   turned a quarter. Repeat. The arc across each square — a quarter circle of
+   the square's own side — is the spiral.
+
+   `side` cycles which end the square comes off: 0 left, 1 top, 2 right,
+   3 bottom. Each arc is centred on one corner and runs between the two
+   corners adjacent to it, so consecutive arcs meet exactly.
+
+   PHI is already defined above, with the rest of the palette constants. */
+
+function goldenSquares(x, y, w, h, depth) {
+  const out = [];
+  for (let i = 0; i < depth && w > 0.6 && h > 0.6; i++) {
+    const side = i % 4;
+    let sq, cx, cy, ax, ay, bx, by;          // square, arc centre, start, end
+    if (side === 0) {                        // square off the left
+      const s = h; sq = { x, y, s };
+      cx = x;     cy = y;                    // centre: top-left
+      ax = x;     ay = y + s;                // start:  bottom-left
+      bx = x + s; by = y;                    // end:    top-right
+      x += s; w -= s;
+    } else if (side === 1) {                 // square off the top
+      const s = w; sq = { x, y, s };
+      cx = x + s; cy = y;                    // centre: top-right
+      ax = x;     ay = y;
+      bx = x + s; by = y + s;
+      y += s; h -= s;
+    } else if (side === 2) {                 // square off the right
+      const s = h; sq = { x: x + w - s, y, s };
+      cx = x + w; cy = y + s;                // centre: bottom-right
+      ax = x + w; ay = y;
+      bx = x + w - s; by = y + s;
+      w -= s;
+    } else {                                 // square off the bottom
+      const s = w; sq = { x, y: y + h - s, s };
+      cx = x;     cy = y + h;                // centre: bottom-left
+      ax = x + s; ay = y + h;
+      bx = x;     by = y + h - s;
+      h -= s;
+    }
+    out.push({ sq, r: sq.s, ax, ay, bx, by, cx, cy });
+  }
+  return out;
+}
+
+function renderSpiral(replay) {
+  const svg = document.getElementById('spiral');
+  if (!svg) return;
+
+  const PAD = 5;
+  const segs = goldenSquares(PAD, PAD, 610, 610 / PHI, 11);
+
+  /* Colour: wind from the darkest step on the outside to the palest at the
+     centre, so the spiral shows the lightness ramp rather than sampling the
+     grid at random. Hue still alternates across the scheme's hues, which is
+     the point — the ramp holds its contrast on every one of them. */
+  const ordered = palette.length
+    ? palette.slice().sort((a, b) => (a.l - b.l) || (b.c - a.c))
+    : [];
+  const pick = i => (ordered.length
+    ? ordered[Math.floor(i * ordered.length / segs.length)].css
+    : 'currentColor');
+
+  const rects = segs.map(s =>
+    `<rect class="rect" x="${s.sq.x.toFixed(1)}" y="${s.sq.y.toFixed(1)}" ` +
+    `width="${s.sq.s.toFixed(1)}" height="${s.sq.s.toFixed(1)}"/>`).join('');
+
+  const arcs = segs.map((s, i) => {
+    // Quarter of the circumference of a circle with this square's side as radius.
+    const len = (Math.PI * s.r) / 2;
+    return `<path class="arc" style="--len:${len.toFixed(1)}; ` +
+           `transition-delay:${(i * 0.17).toFixed(2)}s, 0s" ` +
+           `stroke="${pick(i)}" ` +
+           `d="M ${s.ax.toFixed(1)} ${s.ay.toFixed(1)} ` +
+           // sweep-flag 1: bulge away from the centre corner, so consecutive
+           // arcs continue each other instead of meeting in a cusp.
+           `A ${s.r.toFixed(1)} ${s.r.toFixed(1)} 0 0 1 ` +
+           `${s.bx.toFixed(1)} ${s.by.toFixed(1)}"/>`;
+  }).join('');
+
+  const wasDrawn = svg.classList.contains('drawn');
+  svg.innerHTML = rects + arcs;
+
+  if (wasDrawn && !replay) {
+    // A palette change should re-tone what is already there, not redraw it.
+    svg.classList.add('drawn');
+  } else {
+    svg.classList.remove('drawn');
+    void svg.getBoundingClientRect();        // commit the undrawn state first
+    requestAnimationFrame(() => svg.classList.add('drawn'));
+  }
 }
 
 // ── Color wheel canvas ──────────────────────────────────────
@@ -718,6 +876,9 @@ function showToast(msg) {
   clearTimeout(t._t);
   t._t = setTimeout(() => t.classList.remove('show'), 2000);
 }
+
+document.getElementById('spiralReplay')
+  .addEventListener('click', () => renderSpiral(true));
 
 // ═══════════════════════════════════════════════════════════
 // INIT

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Virginia P. Payson — Web Design &amp; Development, Basalt &amp; Roaring Fork Valley, Colorado</title>
-<meta name="description" content="Independent application and web development in Basalt, Colorado. Fast, accessible, maintainable websites for mountain-town businesses, nonprofits and destinations. Building in the Roaring Fork Valley since 2002.">
+<meta name="description" content="Independent application and web development in Basalt, Colorado. Live apps you can open and use, plus fast, accessible, maintainable websites for mountain-town businesses, nonprofits and destinations. Building in the Roaring Fork Valley since 2002.">
 <link rel="canonical" href="https://vpayson.onrender.com/">
 <meta property="og:title" content="Virginia P. Payson — Websites and applications, designed and built">
 <meta property="og:description" content="Independent application and web development in Basalt, Colorado. Building in the Roaring Fork Valley since 2002.">
@@ -106,6 +106,33 @@ section{padding-block:clamp(2.75rem,7vh,4.5rem)}
   text-transform:uppercase; color:var(--ink-faint); margin:0 0 2rem;
 }
 
+/* ───────────────────────────  APPLICATIONS  ───────────────────────
+   My own live apps, as opposed to client sites. Given cards rather than
+   the list treatment below, because these are things you can open and
+   use right now and that should not look like another row in a list. */
+.apps{display:grid; gap:1.25rem; grid-template-columns:repeat(auto-fit,minmax(17rem,1fr))}
+.app{
+  display:flex; flex-direction:column; gap:.5rem;
+  padding:1.4rem 1.4rem 1.5rem;
+  background:var(--paper); border:1px solid var(--rule); border-radius:14px;
+  text-decoration:none;
+  transition:border-color .18s ease, transform .18s ease;
+}
+.app:hover,.app:focus-visible{border-color:var(--brand); transform:translateY(-2px)}
+.app.lead{grid-column:1/-1; background:var(--brand-soft); border-color:var(--brand)}
+.app .tag{
+  font-size:var(--step--1); font-weight:600; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--brand);
+}
+.app h3{font-size:var(--step-1)}
+.app.lead h3{font-size:var(--step-2); max-width:24ch}
+.app p{color:var(--ink-soft); font-size:var(--step--1); max-width:56ch}
+.app .cta{
+  margin-block-start:.4rem; color:var(--brand); font-weight:600;
+  font-size:var(--step-0);
+}
+.app .stack{font-size:var(--step--1); color:var(--ink-faint)}
+
 /* ──────────────────────────────  WORK  ────────────────────────── */
 .work{display:grid; border-block-start:1px solid var(--rule)}
 .item{
@@ -172,11 +199,55 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
       <span><strong>24 years</strong> in this valley</span>
       <span><strong>50+</strong> custom WordPress builds</span>
       <span><strong>RISD</strong>-trained designer who writes the backend</span>
+      <span><strong>Apps in daily use</strong>, not just sites</span>
     </div>
     <div class="phi" aria-hidden="true">
       <span></span><span></span><span></span><span></span><span></span>
     </div>
   </header>
+
+  <section class="shell">
+    <h2 class="section-head">Applications &mdash; open and use these now</h2>
+    <div class="apps">
+
+      <a class="app lead" href="work/evergreen/">
+        <span class="tag">Interactive walkthrough</span>
+        <h3>Route driver application</h3>
+        <p>A compost hauler ran its routes off a printed spreadsheet. I built a
+           progressive web app that reads that same sheet live — drivers work
+           from their phones, the office watches progress arrive, and nobody had
+           to learn a new system. Turn-by-turn navigation, notes and photos back
+           from the cab, an approval queue for customer requests, and a server
+           that physically cannot show a driver the billing columns.</p>
+        <span class="stack">Node &middot; Express &middot; WebSockets &middot; Google Sheets API &middot; vanilla JS &middot; in daily use</span>
+        <span class="cta">Try the walkthrough &rarr;</span>
+      </a>
+
+      <a class="app" href="palette/">
+        <span class="tag">Design tool</span>
+        <h3>Golden Section Palette</h3>
+        <p>A colour wheel and a palette generator built on the OKLCH colour
+           space, where perceptual lightness is even across hues — so a palette
+           holds its contrast ratios on every pairing instead of passing on some
+           and quietly failing on others. Exports straight to CSS custom
+           properties.</p>
+        <span class="stack">OKLCH &middot; golden-ratio harmonies &middot; no dependencies</span>
+        <span class="cta">Open the tool &rarr;</span>
+      </a>
+
+      <a class="app" href="https://cymatic-decoder.onrender.com/">
+        <span class="tag">Experiment</span>
+        <h3>Resonance Engine</h3>
+        <p>Musical, brainwave, colour and cymatic frequencies mapped against each
+           other in one interface, with additive synthesis through the Web Audio
+           API and a live canvas visualisation. Built because I wanted to see
+           whether the correspondences held up.</p>
+        <span class="stack">Web Audio API &middot; canvas &middot; Python backend</span>
+        <span class="cta">Open it &rarr;</span>
+      </a>
+
+    </div>
+  </section>
 
   <section class="band">
     <div class="shell">

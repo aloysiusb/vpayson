@@ -1,0 +1,1270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A Day on the Route — driver app walkthrough</title>
+<meta name="description" content="Interactive walkthrough of a route-driver application: live route sync, turn-by-turn navigation, notes and photos back to the office. Sample data throughout.">
+<link rel="canonical" href="https://vpayson.com/work/evergreen/walkthrough.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,100..1000&display=swap" rel="stylesheet">
+
+<!-- The phone screen uses the REAL driver stylesheets, so this walkthrough
+     cannot drift away from how the app actually looks. Only the data and the
+     sequence are scripted. -->
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+
+<style>
+  /* ── Stage ──────────────────────────────────────────────────────────── */
+  body {
+    margin: 0;
+    background: #0f1a12;
+    color: #e6efe8;
+    font-family: 'Google Sans Flex', -apple-system, system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  .stage {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 24px 20px 40px;
+    display: grid;
+    gap: 22px;
+    justify-items: center;
+  }
+  .narration { width: 100%; max-width: 1000px; }
+
+  /* The phone rules live at the very bottom of this stylesheet, after every
+     rule they override. They used to sit here, above .phone, .screen and
+     .wt-rail — same specificity, earlier in the file, so the desktop widths
+     won every time and the whole block did nothing on a phone. */
+
+  .intro { grid-column: 1 / -1; text-align: center; margin-bottom: 4px; }
+  .demo-flag {
+    display: inline-block;
+    background: #f59e0b;
+    color: #241a02;
+    font-size: 11.5px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: var(--r-pill);
+    margin-bottom: 12px;
+  }
+  /* Back out to the case study and the portfolio. This copy is reached from a
+     portfolio, so it needs a way home; the in-app original does not. */
+  .wt-back { margin-top: 14px; font-size: 13px; opacity: .85; }
+  .wt-back a { color: inherit; text-underline-offset: .2em; }
+  /* A screen-within-a-screen reads as footage, not as something to press. */
+  .phone::after {
+    content: "DEMO";
+    position: absolute;
+    top: 50%; left: -34px;
+    transform: rotate(-90deg);
+    transform-origin: center;
+    font-size: 10px; font-weight: 800; letter-spacing: 0.22em;
+    color: rgba(255,255,255,0.28);
+  }
+  .screen { cursor: default; }
+  .screen button, .screen select, .screen a { pointer-events: none; }
+  .intro h1 { font-size: 26px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .intro p { margin: 0; opacity: 0.65; font-size: 14px; }
+
+  /* ── Phone ──────────────────────────────────────────────────────────── */
+  /* 375px of screen is a real iPhone's CSS viewport. At the 298px this used to
+     be, every address wrapped and a single stop card came out 213px tall —
+     nothing like what a driver actually sees. */
+  /* A landscape iPad, because that is what sits on the dash. The map gets the
+     room it deserves and the stop details move to a side rail, which is how
+     every in-car nav system lays out and why they are readable at a glance. */
+  .phone {
+    width: 100%;
+    max-width: 1000px;
+    background: #10100f;
+    border-radius: 26px;          /* physical device curve, not a design token */
+    padding: 13px 15px;
+    box-shadow: 0 22px 60px rgba(0,0,0,0.5), 0 0 0 2px #2a2a28;
+    position: relative;
+  }
+  .notch { display: none; }       /* no notch on a landscape slab */
+  .screen {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--bg);
+    aspect-ratio: 4 / 3;          /* iPad landscape */
+    display: flex;
+    flex-direction: column;
+  }
+  /* The app's own chrome is fixed-position in the real page; inside the phone
+     it has to sit in normal flow, so a few positions are re-anchored here. */
+  .screen .route-header { flex-shrink: 0; }
+  .screen .content { flex: 1; overflow-y: auto; padding-bottom: 12px; }
+  /* app.css caps .content at 600px and centres it, which is right for a phone
+     and wrong for a landscape slab — it left the map 396px wide inside a
+     970px screen. The map view is a full-width flex column here. */
+  .screen #view-map {
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .screen #toast {
+    position: absolute; bottom: 74px;
+  }
+  .screen .action-bar {
+    position: absolute; left: 0; right: 0; bottom: 0;
+  }
+
+  /* ── Narration ──────────────────────────────────────────────────────── */
+  .narration { padding-top: 10px; }
+  .scene-no {
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    opacity: 0.5; font-weight: 600;
+  }
+  .scene-title {
+    font-size: 22px; font-weight: 700; margin: 6px 0 10px; line-height: 1.25;
+  }
+  .scene-body { font-size: 15px; line-height: 1.65; opacity: 0.82; margin: 0; }
+  .scene-body b { color: #7fd6a0; font-weight: 600; }
+
+  .dots { display: flex; gap: 6px; margin: 22px 0 18px; flex-wrap: wrap; }
+  .dot {
+    width: 26px; height: 4px; border-radius: 999px;
+    background: rgba(255,255,255,0.18); border: 0; padding: 0; cursor: pointer;
+  }
+  .dot.seen { background: rgba(127,214,160,0.45); }
+  .dot.active { background: #7fd6a0; }
+
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .controls button {
+    background: rgba(255,255,255,0.08);
+    color: #e6efe8;
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: var(--r-control);
+    padding: 9px 16px;
+    font: inherit; font-size: 14px; font-weight: 600;
+    cursor: pointer;
+  }
+  .controls button:hover { background: rgba(255,255,255,0.14); }
+  .controls button.primary { background: #22c55e; border-color: #22c55e; color: #08240f; }
+  .controls .spacer { flex: 1; }
+  .hint { font-size: 12.5px; opacity: 0.5; margin-top: 16px; line-height: 1.5; }
+
+  /* A stand-in for the Google map. The walkthrough has to run with no API key
+     and no network, so the map is drawn rather than loaded — everything
+     layered on top of it (turn banner, nav card) is the app's real markup. */
+  /* Map left, details right — the in-car layout. */
+  .wt-stage { display: flex; flex: 1 1 auto; min-height: 0; height: 100%; }
+  .wt-mapwrap { position: relative; flex: 1; min-width: 0; }
+  .wt-rail {
+    width: 300px; flex-shrink: 0;
+    border-left: 1px solid var(--border);
+    background: var(--surface);
+    overflow-y: auto;
+  }
+  .wt-map {
+    position: absolute; inset: 0;
+    background: #e8ece7; overflow: hidden;
+  }
+  /* The turn banner floats over the map instead of stealing a slice of it. */
+  #turn-banner {
+    position: absolute; z-index: 6;
+    top: 10px; left: 10px; right: 10px;
+    margin: 0;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+  }
+  .wt-map svg { display: block; width: 100%; height: 100%; }
+  #wt-streetview { background: #111; }
+  /* Short: the drive loop moves this every 60 ms, so a long transition would
+     smear it into a lag rather than smoothing it. */
+  #wt-driver { transition: cx 0.12s linear, cy 0.12s linear; }
+
+  .wt-modebar {
+    display: flex; gap: 6px; padding: 8px 12px; flex-wrap: wrap;
+    background: var(--bg);
+  }
+  .wt-mode {
+    font-size: 11.5px; font-weight: 600; padding: 5px 10px;
+    border-radius: var(--r-card); background: var(--surface);
+    color: var(--text-muted); border: 1px solid var(--border);
+  }
+  .wt-mode.on { background: #22c55e; color: #fff; border-color: #22c55e; }
+  #wt-sat { cursor: pointer; user-select: none; }
+
+  .wt-navcard { padding: 10px 12px 14px; background: var(--surface); }
+  .sv-note:not(:empty) {
+    margin: 10px 12px 0; padding: 8px 10px;
+    background: var(--hold-bg); color: var(--hold-text);
+    border-radius: var(--r-control); font-size: 12px; line-height: 1.4;
+  }
+
+  /* Asked before anything happens, and left on screen afterwards so it doubles
+     as the switch. A question that vanishes once answered is the reason nobody
+     finds the toggle later. */
+  .viewpick {
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: var(--r-card);
+    padding: 14px;
+    margin-bottom: 18px;
+    background: rgba(255,255,255,0.03);
+  }
+  .viewpick-q { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+  .viewpick-opts { display: flex; gap: 10px; flex-wrap: wrap; }
+  .viewpick-btn {
+    flex: 1 1 170px;
+    display: grid;
+    gap: 2px;
+    text-align: left;
+    padding: 11px 13px;
+    border-radius: var(--r-control);
+    border: 1.5px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.04);
+    color: #e6efe8;
+    font: inherit;
+    cursor: pointer;
+  }
+  .viewpick-btn:hover { background: rgba(255,255,255,0.09); }
+  .viewpick-btn.on {
+    border-color: #22c55e;
+    background: rgba(34,197,94,0.16);
+    box-shadow: 0 0 0 1px #22c55e inset;
+  }
+  .viewpick-ico { font-size: 17px; }
+  .viewpick-name { font-size: 14px; font-weight: 700; }
+  .viewpick-why { font-size: 11.5px; opacity: 0.66; line-height: 1.35; }
+  .viewpick-note { font-size: 11.5px; opacity: 0.5; margin-top: 9px; }
+
+  .modeswitch { display: flex; gap: 8px; margin-bottom: 18px; }
+  .modeswitch button {
+    background: rgba(255,255,255,0.07);
+    color: #e6efe8;
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: var(--r-pill);
+    padding: 7px 16px;
+    font: inherit; font-size: 13px; font-weight: 600;
+    cursor: pointer;
+  }
+  .modeswitch button.on { background: #22c55e; border-color: #22c55e; color: #08240f; }
+
+  /* The phone buzzing when an alert fires. This is the part a driver feels
+     rather than sees, so on screen it has to be shown some other way. */
+  @keyframes wt-buzz {
+    0%, 100% { transform: translateX(0); }
+    15% { transform: translateX(-3px); }
+    30% { transform: translateX(3px); }
+    45% { transform: translateX(-2px); }
+    60% { transform: translateX(2px); }
+    75% { transform: translateX(-1px); }
+  }
+  .phone.buzzing { animation: wt-buzz 0.5s ease-in-out 2; }
+
+  .buzz-tag {
+    position: absolute; top: 14px; right: 14px; z-index: 20;
+    background: #f59e0b; color: #1a1a1a;
+    font-size: 10px; font-weight: 800; letter-spacing: 0.08em;
+    padding: 4px 9px; border-radius: var(--r-pill);
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .buzz-tag.on { opacity: 1; }
+
+  .drive-readout {
+    font-size: 13px; line-height: 1.6; opacity: 0.8;
+    border-left: 2px solid rgba(127,214,160,0.5);
+    padding-left: 12px; margin: 4px 0 18px;
+    min-height: 66px;
+  }
+  .drive-readout b { color: #7fd6a0; font-weight: 600; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .phone.buzzing { animation: none; }
+    .screen * { transition: none !important; animation: none !important; }
+  }
+
+  /* ── Phone ──────────────────────────────────────────────────────────────
+     The demo shows an iPad because that is what sits on the dash, but the
+     page itself gets opened on a phone all the time. Below iPad width the
+     side rail drops under the map so the map keeps the room, rather than both
+     being squeezed into columns too narrow to read.
+
+     This block must stay last: every rule it overrides is declared above it
+     at the same specificity, so position in the file is what decides. */
+  @media (max-width: 760px) {
+    .wt-stage { flex-direction: column; }
+    .wt-rail {
+      width: auto;
+      flex-shrink: 1;          /* 300px + no shrink was what forced the page wide */
+      border-left: 0;
+      border-top: 1px solid var(--border);
+    }
+    .wt-mapwrap { min-height: 240px; }
+    .screen { aspect-ratio: auto; height: 560px; }
+    .phone { border-radius: 18px; padding: 8px; }
+    .viewpick-btn { flex-basis: 100%; }
+    .turn-dist { font-size: 22px; }
+
+    /* A grid item will not shrink below its own min-content unless told to,
+       so one wide descendant drags the whole track — and the page — with it. */
+    .stage { grid-template-columns: minmax(0, 1fr); padding-inline: 16px; }
+    .stage > * { min-width: 0; max-width: 100%; }
+    .screen .route-header { min-width: 0; }
+  }
+
+  /* ── Touch sizing ────────────────────────────────────────────────────────
+     Prev / Navigate / Done are what a person taps while holding the phone up
+     to show someone the app, and they were 35px. 44px is the minimum a
+     fingertip reliably hits. */
+  /* By element, not by class: the page's own controls are bare <button>s with
+     no class at all, which is why naming classes here missed them. */
+  button, .nav-btn {
+    min-height: 44px;
+  }
+  /* Everything inside .screen is the simulated app, drawn at the app's own
+     metrics and already pointer-events: none. It keeps its sizing. */
+  .screen button, .screen .nav-btn { min-height: 0; }
+  /* The step dots stay 4px to look at — the hit area around them does not. */
+  .dot {
+    padding: 20px 8px;
+    background-clip: content-box;
+    box-sizing: content-box;
+  }
+
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="intro">
+    <div class="demo-flag">▶ Demonstration — a recording of the app, not the app itself</div>
+    <h1>A day on the route</h1>
+    <p>What a driver sees, start to finish. Plays on its own — no truck required.
+       <b>Every customer, address, note and gate code here is invented</b>, and
+       this copy has no server behind it — no route data, no spreadsheet, no
+       account. Two things do work: <b>switch between map, satellite and Street
+       View</b>, and <b>use Prev / Next to go at your own pace</b>.</p>
+    <p class="wt-back">
+      <a href="./">← How this was built</a> &middot;
+      <a href="/">Virginia P. Payson</a>
+    </p>
+  </div>
+
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="buzz-tag" id="buzz-tag">📳 BUZZ</div>
+    <div class="screen" id="screen">
+      <header class="route-header">
+        <div class="route-header-top">
+          <a href="#" class="home-btn" title="All Routes">⌂</a>
+          <div>
+            <div class="route-title" id="route-name">Valley Residential</div>
+            <div class="route-day" id="route-day">Wednesday</div>
+          </div>
+          <div class="route-date" id="route-date">Sep 17</div>
+        </div>
+        <div class="progress-wrap"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+        <div class="progress-text" id="progress-text">0 of 5 done</div>
+        <div class="view-tabs">
+          <button class="view-tab active" id="tab-stops">Stops</button>
+          <button class="view-tab" id="tab-map">🗺 Map</button>
+        </div>
+      </header>
+
+      <div id="pending-status" style="display:none;"></div>
+
+      <div class="content" id="view-stops">
+        <div id="stops-list"></div>
+      </div>
+
+      <div class="content" id="view-map" style="display:none; padding:0;">
+        <div class="wt-modebar">
+          <span class="wt-mode">📋 Planned</span>
+          <span class="wt-mode on">🧭 Follow</span>
+          <span class="wt-mode" id="wt-sat" onclick="setWtView('sat')" role="button" tabindex="0">🛰 Satellite</span>
+          <span class="wt-mode" id="wt-sv" onclick="setWtView('street')" role="button" tabindex="0">👁 Street View</span>
+        </div>
+
+        <div class="wt-stage">
+        <div class="wt-mapwrap">
+        <div id="turn-banner" class="show">
+          <div class="turn-arrow" id="turn-arrow">↑</div>
+          <div class="turn-info">
+            <div class="turn-dist" id="turn-dist">—</div>
+            <div class="turn-text" id="turn-text">—</div>
+            <div class="turn-next" id="turn-next"></div>
+          </div>
+        </div>
+
+        <div class="wt-map" id="wt-streetview" style="display:none"></div>
+        <div class="wt-map" id="wt-realmap" style="display:none"></div>
+        <div class="wt-map" id="wt-drawnmap">
+          <svg viewBox="0 0 320 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <!-- Map view: the plain schematic -->
+            <g id="wt-roads">
+              <rect width="320" height="300" fill="#e8ece7"/>
+              <g stroke="#ffffff" stroke-width="13" stroke-linecap="round">
+                <path d="M-10 84 H330"/><path d="M-10 196 H330"/>
+                <path d="M74 -10 V310"/><path d="M226 -10 V310"/>
+              </g>
+              <g stroke="#f3f5f2" stroke-width="7">
+                <path d="M-10 140 H330"/><path d="M150 -10 V310"/>
+              </g>
+            </g>
+
+            <!-- Satellite view. Drawn, not photographed: the walkthrough has
+                 to run with no API key and no network. The point it makes is
+                 the real one — from the air a driver can see the driveway,
+                 the outbuildings and where the bin actually sits, which a
+                 street map cannot show. -->
+            <g id="wt-aerial" style="display:none">
+              <rect width="320" height="300" fill="#6b7d5a"/>
+              <g fill="#7d8f68" opacity="0.7">
+                <rect x="0" y="0" width="320" height="70"/>
+                <rect x="240" y="100" width="80" height="200"/>
+                <rect x="0" y="215" width="150" height="85"/>
+              </g>
+              <!-- asphalt -->
+              <g stroke="#4a4a46" stroke-width="15" stroke-linecap="square">
+                <path d="M-10 84 H330"/><path d="M-10 196 H330"/>
+                <path d="M74 -10 V310"/><path d="M226 -10 V310"/>
+              </g>
+              <g stroke="#55554f" stroke-width="9">
+                <path d="M-10 140 H330"/><path d="M150 -10 V310"/>
+              </g>
+              <!-- driveways -->
+              <g stroke="#9a9384" stroke-width="5" stroke-linecap="round">
+                <path d="M236 84 H250"/><path d="M84 140 H98"/>
+                <path d="M150 168 V182"/><path d="M60 196 V210"/>
+              </g>
+              <!-- buildings, with a little shadow so they read as 3D -->
+              <g>
+                <rect x="243" y="70" width="30" height="26" fill="#2f3033" opacity="0.35"/>
+                <rect x="240" y="67" width="30" height="26" fill="#c9c3b4"/>
+                <rect x="92" y="150" width="26" height="22" fill="#2f3033" opacity="0.35"/>
+                <rect x="89" y="147" width="26" height="22" fill="#bfb9ab"/>
+                <rect x="139" y="182" width="24" height="20" fill="#2f3033" opacity="0.35"/>
+                <rect x="136" y="179" width="24" height="20" fill="#c5bfb0"/>
+                <rect x="40" y="206" width="22" height="18" fill="#2f3033" opacity="0.35"/>
+                <rect x="37" y="203" width="22" height="18" fill="#bdb7a9"/>
+                <rect x="252" y="210" width="34" height="26" fill="#2f3033" opacity="0.35"/>
+                <rect x="249" y="207" width="34" height="26" fill="#c9c3b4"/>
+              </g>
+              <!-- trees -->
+              <g fill="#3f5236">
+                <circle cx="118" cy="66" r="7"/><circle cx="132" cy="74" r="5"/>
+                <circle cx="196" cy="110" r="6"/><circle cx="206" cy="120" r="8"/>
+                <circle cx="40" cy="120" r="7"/><circle cx="28" cy="132" r="5"/>
+                <circle cx="280" cy="160" r="6"/><circle cx="292" cy="172" r="8"/>
+                <circle cx="170" cy="240" r="7"/><circle cx="186" cy="250" r="5"/>
+              </g>
+            </g>
+            <path id="wt-route" d="M74 280 V196 H226 V84"
+                  fill="none" stroke="#22c55e" stroke-width="7"
+                  stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+            <circle id="wt-target" cx="226" cy="84" r="9" fill="#ef4444" stroke="#fff" stroke-width="3"/>
+            <circle id="wt-driver" cx="74" cy="250" r="8" fill="#2563eb" stroke="#fff" stroke-width="3"/>
+          </svg>
+        </div>
+
+        </div>
+
+        <div class="wt-rail">
+        <div class="sv-note" id="sv-note"></div>
+        <div class="wt-navcard">
+          <div class="nav-progress-row">
+            <span class="nav-stop-count" id="wt-nav-count">3 of 5</span>
+            <span class="nav-done-count" id="wt-nav-eta">🚗 4 min away</span>
+          </div>
+          <div class="nav-stop-name" id="wt-nav-name">Riverbend House</div>
+          <div class="nav-stop-addr" id="wt-nav-addr">1190 County Rd 118, Silt</div>
+          <div class="nav-note urgent" id="wt-nav-note">Dog — call on arrival</div>
+          <div class="nav-actions">
+            <button class="nav-btn nav-btn-prev">← Prev</button>
+            <button class="nav-btn nav-btn-maps">↗ Navigate</button>
+            <button class="nav-btn nav-btn-done">✓ Done</button>
+            <button class="nav-btn nav-btn-next">Next →</button>
+          </div>
+        </div>
+        </div>
+        </div>
+      </div>
+
+      <div id="toast"></div>
+
+      <div class="action-bar">
+        <a href="#" class="btn-secondary">← Routes</a>
+        <button class="btn-primary" id="day-btn">Start My Day</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="narration">
+    <div class="viewpick" id="viewpick">
+      <div class="viewpick-q">How do you want to see it?</div>
+      <div class="viewpick-opts">
+        <button id="pick-map" class="viewpick-btn on" type="button" onclick="setWtView('map')">
+          <span class="viewpick-ico">🗺</span>
+          <span class="viewpick-name">Street map</span>
+          <span class="viewpick-why">Road names, clearest while driving</span>
+        </button>
+        <button id="pick-sat" class="viewpick-btn" type="button" onclick="setWtView('sat')">
+          <span class="viewpick-ico">🛰</span>
+          <span class="viewpick-name">Satellite</span>
+          <span class="viewpick-why">See driveways, gates and where the bin sits</span>
+        </button>
+        <button id="pick-street" class="viewpick-btn" type="button" onclick="setWtView('street')">
+          <span class="viewpick-ico">👁</span>
+          <span class="viewpick-name">Street View</span>
+          <span class="viewpick-why">The property from the road, as the driver will see it</span>
+        </button>
+      </div>
+      <div class="viewpick-note" id="sat-note">Switch any time — drivers get the same toggle in the app.</div>
+    </div>
+
+    <div class="modeswitch">
+      <button id="mode-drive" class="on" type="button">🎬 Drive it</button>
+      <button id="mode-steps" type="button">⏱ Step through</button>
+    </div>
+
+    <div class="scene-no" id="scene-no">Scene 1 of 8</div>
+    <h2 class="scene-title" id="scene-title">Opening the route</h2>
+    <p class="scene-body" id="scene-body">…</p>
+    <div class="drive-readout" id="drive-readout" hidden></div>
+
+    <div class="dots" id="dots"></div>
+
+    <div class="controls">
+      <button id="play" class="primary" type="button">⏸ Pause</button>
+      <button id="prev" type="button">← Back</button>
+      <button id="next" type="button">Next →</button>
+      <span class="spacer"></span>
+      <button id="replay" type="button">↺ Replay</button>
+    </div>
+
+    <p class="hint">
+      Scripted walkthrough with sample stops — it never touches the live sheet.
+      To drive a real route on a phone, use sim mode instead:
+      <code>/driver/&lt;route&gt;?sim=1</code>
+    </p>
+  </div>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────────────────
+   A scripted walkthrough of the driver's screen.
+
+   Deliberately self-contained: no Google Maps key, no Google Sheet, no
+   network, no access code. It has to play on a bad hotel wifi in front of a
+   customer, years from now, without anything upstream being alive.
+
+   It links the app's real stylesheets and reuses its real class names, so the
+   LOOK cannot drift. The data and the sequence are scripted — that is the
+   trade-off, and the reason the hint above points at sim mode for testing
+   real behaviour.
+   ───────────────────────────────────────────────────────────────────────── */
+
+const STOPS = [
+  { row: 4,  name: 'R. Halloway',      addr: '412 Fireweed Ave, Carbondale',  note: '',                        urgency: '',       access: 'Bin behind the blue gate' },
+  { row: 5,  name: 'Kestrel Bakery',   addr: '88 Cottonwood St, Carbondale',      note: 'Extra bin Weds',          urgency: 'info',   access: '' },
+  { row: 6,  name: 'Riverbend House', addr: '1190 County Rd 118, Silt',    note: 'Dog — call on arrival',   urgency: 'urgent', access: '' },
+  { row: 7,  name: 'Elk Meadow HOA',   addr: '35 Wapiti Trail',       note: '',                        urgency: '',       access: 'Gate code on file' },
+  { row: 8,  name: 'Valley Grange Co-op', addr: '7 Foundry Pl, Glenwood',   note: 'On hold until Oct',       urgency: 'hold',   access: '' },
+];
+
+// state the scenes manipulate
+let done = new Set();
+let pending = 0;
+let toastHtml = '';
+let addingNoteRow = null;
+let noteDraft = '';
+let view = 'stops';                       // 'stops' | 'map'
+let turn = null;                          // {arrow, dist, text, next}
+let driverAt = { x: 74, y: 250 };         // position on the stand-in map
+
+const SCENES = [
+  {
+    title: 'Opening the route',
+    body: 'The driver taps their route and sees the whole day — <b>every stop in sheet order</b>, with the notes the office already wrote. No paper, no scrolling a spreadsheet on a phone.',
+    apply() {
+      done = new Set(); pending = 0; toastHtml = ''; addingNoteRow = null;
+      // The walkthrough loops, so anything a later step writes is undone here.
+      const marcy = STOPS.find(s => s.row === 4);
+      if (marcy) { marcy.note = ''; marcy.urgency = ''; }
+    },
+  },
+  {
+    title: 'Notes are color-coded',
+    body: 'Notes carry weight. <b>Red</b> means something the driver needs before they get out of the truck — a dog, a locked gate. <b>Amber</b> is a hold. Access details ride along on the card itself.',
+    apply() {},
+  },
+  {
+    title: 'One tap marks a stop done',
+    body: 'A single big target — easy with gloves on, no menus. The bar at the top fills as the day goes, so the driver always knows where they stand.',
+    apply() { done = new Set([4]); toastHtml = ''; },
+  },
+  {
+    title: 'The app knows when they arrive',
+    body: 'Within <b>80 meters</b> of the next stop, the phone buzzes and asks. One tap confirms and moves on — no hunting for the right row while parked in the road.',
+    apply() {
+      done = new Set([4]);
+      toastHtml = 'Arrived at <b>Kestrel Bakery</b>? <button class="fake-done">✓ Done</button>';
+    },
+  },
+  {
+    title: 'Navigation, on their own screen',
+    view: 'map',
+    body: 'The map rides with the driver at street level, and <b>the next turn sits right on top</b> — distance, the manoeuvre, and what comes after it. They don’t have to leave the app to know where they’re going.',
+    apply() {
+      done = new Set([4, 5]);
+      toastHtml = ''; addingNoteRow = null;
+      turn = { arrow: '↱', dist: '450 ft', text: 'Turn right onto County Road 118', next: 'Then: arrive at Riverbend House' };
+      driverAt = { x: 74, y: 240 };
+    },
+  },
+  {
+    title: 'The stop is always in view',
+    view: 'map',
+    body: 'Under the map: which stop this is, how far out, and <b>the note the office left</b> — red, so a dog or a locked gate is known before they open the door. Done is right there; no hunting for the row.',
+    apply() {
+      done = new Set([4, 5]);
+      turn = { arrow: '↑', dist: '0.2 mi', text: 'Continue on County Road 118', next: 'Then: arrive at Riverbend House' };
+      driverAt = { x: 160, y: 196 };
+    },
+  },
+  {
+    title: 'Arriving',
+    view: 'map',
+    body: 'Within <b>80 meters</b> the phone buzzes and asks — one tap marks it done and moves to the next stop. The driver never has to look away from the road to find the right row.',
+    apply() {
+      done = new Set([4, 5]);
+      turn = { arrow: '🏁', dist: 'Arriving', text: 'Riverbend House', next: '' };
+      driverAt = { x: 226, y: 100 };
+      toastHtml = 'Arrived at <b>Riverbend House</b>? <button class="fake-done">✓ Done</button>';
+    },
+  },
+  {
+    title: 'Reporting a problem in one tap',
+    body: 'Four buttons on every stop — <b>contamination, overflow, skipped, photo</b>. One press files it into the sheet with no typing at all. A second press says how much: <b>1 bag, 2 bags, 3+ bags</b>. The wording on those buttons is the office\'s to change, and it is the same wording that lands in the sheet.',
+    apply() {
+      done = new Set([4, 5]);
+      toastHtml = '';
+      addingNoteRow = null;
+      const marcy = STOPS.find(s => s.row === 4);
+      if (marcy) { marcy.note = '🚫 Contamination: 2 bags'; marcy.urgency = 'urgent'; }
+    },
+  },
+  {
+    title: 'A photo, straight from the curb',
+    body: 'The camera opens to the shutter. The photo is shrunk on the phone — three to five megabytes down to about a hundred kilobytes — so it sends on one bar of signal, and a link lands in the route sheet. <b>The office sees the picture on their screen within seconds.</b>',
+    apply() {
+      done = new Set([4, 5]);
+      toastHtml = '';
+      addingNoteRow = null;
+      const marcy = STOPS.find(s => s.row === 4);
+      if (marcy) { marcy.note = '🚫 Contamination: 2 bags · 📷 Photo'; marcy.urgency = 'urgent'; }
+    },
+  },
+  {
+    title: 'Adding a note from the truck',
+    body: 'Anything the driver notices goes straight back to the office — a gate code, a bin that was blocked, a customer request. It lands in <b>the same sheet the office already uses</b>.',
+    apply() {
+      done = new Set([4, 5]);
+      toastHtml = '';
+      addingNoteRow = 7;
+      noteDraft = 'New gate code — see office, keypad on left post';
+    },
+  },
+  {
+    title: 'Signal drops. Nothing is lost.',
+    body: 'Half this territory has no bars. When a save can’t get through, <b>the work stays marked done</b> and waits. The driver is told plainly how much is queued — no silent failures, nothing to remember.',
+    apply() {
+      done = new Set([4, 5, 6]);
+      addingNoteRow = null;
+      pending = 2;
+      toastHtml = '';
+    },
+  },
+  {
+    title: 'Back in range, it catches up',
+    body: 'The moment there’s signal again, everything queued goes out on its own and the banner clears. The driver never has to think about it or redo a stop.',
+    apply() {
+      done = new Set([4, 5, 6]);
+      pending = 0;
+      toastHtml = 'All changes saved';
+    },
+  },
+  {
+    title: 'End of the day',
+    body: 'Every stop logged, every note in the sheet, and the office watched it happen in real time — <b>without a single phone call</b>.',
+    apply() {
+      done = new Set([4, 5, 6, 7, 8]);
+      pending = 0;
+      toastHtml = '';
+    },
+  },
+];
+
+const SCENE_MS = 5200;
+let idx = 0;
+let playing = true;
+let timer = null;
+
+// ── Rendering: mirrors driver.js's stopCardHtml, same classes ─────────────
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function noteClass(u) {
+  return u === 'urgent' ? 'note-urgent' : u === 'hold' ? 'note-hold' : 'note-info';
+}
+
+function cardHtml(s) {
+  const isDone = done.has(s.row);
+  const noteBlock = addingNoteRow === s.row
+    ? '<textarea class="note-edit" rows="2">' + esc(noteDraft) + '</textarea>'
+    : s.note
+      ? '<div class="stop-note ' + noteClass(s.urgency) + '">' + esc(s.note) + '</div>'
+      : (isDone ? '' : '<div class="stop-note-add">+ Add note</div>');
+
+  const action = isDone
+    ? '<button class="undo-btn">Undo</button>'
+    : '<button class="done-btn" aria-label="Mark done">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" ' +
+        'stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+      '</button>';
+
+  return '<div class="stop-card' + (isDone ? ' completed' : '') + '">' +
+      '<div class="stop-main">' +
+        '<div class="stop-info">' +
+          '<div class="stop-account">' + esc(s.name) + '</div>' +
+          '<div class="stop-address">' + esc(s.addr) + '</div>' +
+          '<div class="stop-action-row"><span class="stop-action-btn">📍 Map</span></div>' +
+          (s.access ? '<div class="stop-access-chip"><span class="field-label">🔑 Access</span>' + esc(s.access) + '</div>' : '') +
+          noteBlock +
+        '</div>' +
+        action +
+      '</div>' +
+    '</div>';
+}
+
+function renderScreen() {
+  document.getElementById('view-stops').style.display = view === 'stops' ? 'block' : 'none';
+  document.getElementById('view-map').style.display   = view === 'map'   ? 'block' : 'none';
+  document.getElementById('tab-stops').classList.toggle('active', view === 'stops');
+  document.getElementById('tab-map').classList.toggle('active', view === 'map');
+
+  if (turn) {
+    document.getElementById('turn-arrow').textContent = turn.arrow;
+    document.getElementById('turn-dist').textContent = turn.dist;
+    document.getElementById('turn-text').textContent = turn.text;
+    document.getElementById('turn-next').textContent = turn.next;
+    document.getElementById('turn-banner').classList.toggle('arriving', turn.arrow === '🏁');
+  }
+  const drv = document.getElementById('wt-driver');
+  if (drv) { drv.setAttribute('cx', driverAt.x); drv.setAttribute('cy', driverAt.y); }
+
+  document.getElementById('stops-list').innerHTML = STOPS.map(cardHtml).join('');
+
+  const pct = Math.round((done.size / STOPS.length) * 100);
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-text').textContent =
+    done.size + ' of ' + STOPS.length + ' done';
+
+  const pend = document.getElementById('pending-status');
+  pend.style.display = pending ? 'block' : 'none';
+  pend.textContent = pending === 1
+    ? '1 change waiting for signal — it will save automatically'
+    : pending + ' changes waiting for signal — they will save automatically';
+
+  const toast = document.getElementById('toast');
+  toast.innerHTML = toastHtml;
+  toast.classList.toggle('show', !!toastHtml);
+
+  document.getElementById('day-btn').textContent =
+    done.size === STOPS.length ? '✓ Day Complete' : 'Start My Day';
+}
+
+function renderNarration() {
+  const s = SCENES[idx];
+  document.getElementById('scene-no').textContent =
+    'Scene ' + (idx + 1) + ' of ' + SCENES.length;
+  document.getElementById('scene-title').textContent = s.title;
+  document.getElementById('scene-body').innerHTML = s.body;
+
+  document.getElementById('dots').innerHTML = SCENES.map((_, i) =>
+    '<button class="dot' + (i === idx ? ' active' : i < idx ? ' seen' : '') +
+    '" data-i="' + i + '" aria-label="Scene ' + (i + 1) + '"></button>'
+  ).join('');
+}
+
+/* ── Real satellite ────────────────────────────────────────────────────────
+   The drawn map below is a fallback. When the Maps key is reachable this
+   loads the actual Google satellite imagery of Carbondale and drives the
+   truck over real terrain — which is the point of a satellite view and
+   something no amount of drawing achieves.
+
+   It degrades on purpose: if the key is missing, gated behind ACCESS_CODE, or
+   the network is down, the drawn map stays and the walkthrough still plays.
+   A demo that dies on a hotel wifi is worse than a stylised one.
+   ───────────────────────────────────────────────────────────────────────── */
+
+const REAL_ROUTE = [
+  { name: 'Kestrel Bakery',   addr: '88 Cottonwood St, Carbondale',        lat: 39.4021, lng: -107.2114 },
+  { name: 'Town Park Stop',   addr: '4th & Fireweed Ave, Carbondale',  lat: 39.3996, lng: -107.2149 },
+  { name: 'Dry Creek Ranch',  addr: 'Dry Creek Bend, Carbondale',           lat: 39.3921, lng: -107.2099 },
+];
+
+let realMap = null, realMarker = null, realPath = null, realReady = false;
+let svService = null, svPano = null, svStopIdx = -1;
+
+async function initRealMap() {
+  try {
+    /* Static portfolio copy: there is no server to ask for a Maps key, so
+       this deliberately goes straight to the drawn map. The live app fetches
+       /api/maps-key here and loads real satellite and Street View imagery. */
+    throw new Error('static demo — drawn map by design');
+
+    await new Promise((res, rej) => {
+      if (window.google?.maps) return res();
+      const sc = document.createElement('script');
+      // geometry gives computeHeading, so the panorama faces the property
+      // instead of whichever way the camera car happened to be pointing.
+      sc.src = 'https://maps.googleapis.com/maps/api/js?libraries=geometry&key=' + key;
+      sc.async = true; sc.onload = res; sc.onerror = rej;
+      document.head.appendChild(sc);
+    });
+
+    const el = document.getElementById('wt-realmap');
+    realMap = new google.maps.Map(el, {
+      center: { lat: REAL_ROUTE[0].lat, lng: REAL_ROUTE[0].lng },
+      zoom: 17,
+      mapTypeId: 'hybrid',          // real imagery, with street names kept
+      disableDefaultUI: true,
+      gestureHandling: 'none',      // it is footage, not a map to play with
+      keyboardShortcuts: false,
+    });
+
+    realPath = new google.maps.Polyline({
+      map: realMap, path: REAL_ROUTE.map(s => ({ lat: s.lat, lng: s.lng })),
+      strokeColor: '#7dd3fc', strokeWeight: 6, strokeOpacity: 0.95,
+    });
+
+    realMarker = new google.maps.Marker({
+      map: realMap, position: REAL_ROUTE[0],
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8,
+              fillColor: '#2563eb', fillOpacity: 1,
+              strokeColor: '#fff', strokeWeight: 2.5 },
+    });
+
+    REAL_ROUTE.forEach(s => new google.maps.Marker({
+      map: realMap, position: s,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 5,
+              fillColor: '#ef4444', fillOpacity: 1,
+              strokeColor: '#fff', strokeWeight: 2 },
+    }));
+
+    // Street View: the property from the road, which is what a driver is
+    // actually looking at when they pull up. Imagery is patchy on rural
+    // roads, so every lookup widens its radius before giving up, and the
+    // message says so rather than showing a black box.
+    svService = new google.maps.StreetViewService();
+    svPano = new google.maps.StreetViewPanorama(
+      document.getElementById('wt-streetview'),
+      {
+        visible: false,
+        addressControl: false, fullscreenControl: false,
+        motionTracking: false, motionTrackingControl: false,
+        zoomControl: false, linksControl: false, panControl: false,
+        clickToGo: false, showRoadLabels: true,
+        disableDefaultUI: true,
+      }
+    );
+
+    realReady = true;
+    console.log('[walkthrough] real imagery loaded (satellite + street view)');
+  } catch (err) {
+    console.log('[walkthrough] real map unavailable, using the drawn one:', err.message);
+    const why = document.getElementById('sat-note');
+    if (why) why.textContent = 'Satellite here is a drawing — the live app uses real imagery.';
+  }
+}
+
+initRealMap();
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Drive mode — a continuous run, not a slideshow.
+
+   The driver moves along a real path at a believable speed, the distance to
+   the next manoeuvre counts down as they go, and the arrival alert fires by
+   proximity, exactly the way map.js does it in the real app. Scene mode is
+   still there for stepping through detail.
+   ───────────────────────────────────────────────────────────────────────── */
+
+const FT_PER_UNIT = 3;          // SVG unit → feet, tuned so distances read true
+const SPEED_UNITS_S = 20;       // ≈ 41 mph
+const ARRIVE_UNITS = 80 / 0.3048 / FT_PER_UNIT;   // the real app's 80 m radius
+
+// Legs follow the road grid drawn in the SVG (roads at y=84/140/196,
+// x=74/150/226), so the truck never drives through a building.
+const LEGS = [
+  {
+    stop: 'Kestrel Bakery',
+    addr: '88 Cottonwood St, Carbondale',
+    note: 'Extra bin Weds', noteKind: '',
+    pts: [[74,290],[74,196],[226,196],[226,84]],
+    building: [248, 84],        // east of a northbound approach → on the right
+    turns: ['Turn right onto County Road 118', 'Turn left onto Cottonwood Street'],
+    icons: ['↱','↰'],
+  },
+  {
+    stop: 'Riverbend House',
+    addr: '1190 County Rd 118, Silt',
+    note: 'Dog — call on arrival', noteKind: 'urgent',
+    pts: [[226,84],[150,84],[150,140],[74,140]],
+    building: [74, 162],        // south of a westbound approach → on the left
+    turns: ['Continue on Cottonwood Street', 'Turn left onto Fireweed Avenue', 'Turn right onto River Road'],
+    icons: ['↑','↰','↱'],
+  },
+];
+
+/* Which side the building is on, from the direction of travel.
+   A 2D cross product is enough here — no bearings needed on a flat grid.
+   SVG's y axis points DOWN, which flips the usual orientation: a positive
+   cross product means the building is to the RIGHT. Verified against the
+   same cases as the real app's version in map.js. */
+function sideOf(heading, toBuilding) {
+  const z = heading[0] * toBuilding[1] - heading[1] * toBuilding[0];
+  const mag = Math.hypot(...heading) * Math.hypot(...toBuilding);
+  if (!mag) return 'ahead';
+  if (Math.abs(z / mag) < 0.37) return 'ahead';      // ~22°, same as map.js
+  return z > 0 ? 'right' : 'left';
+}
+
+function sideLabel(side) {
+  if (side === 'left') return '⬅ on your left';
+  if (side === 'right') return 'on your right ➡';
+  return 'straight ahead';
+}
+
+let driveOn = false;
+let raf = null;
+let legI = 0, segI = 0, segT = 0, doneCount = 2;
+let holding = 0;                 // ms remaining of an arrival pause
+let lastT = 0;
+
+function segLen(a, b) { return Math.hypot(b[0]-a[0], b[1]-a[1]); }
+
+function distToLegEnd(leg, si, t) {
+  let d = segLen(leg.pts[si], leg.pts[si+1]) * (1 - t);
+  for (let i = si + 1; i < leg.pts.length - 1; i++) d += segLen(leg.pts[i], leg.pts[i+1]);
+  return d;
+}
+
+function fmtFt(units) {
+  const ft = units * FT_PER_UNIT;
+  if (ft > 1000) return (ft / 5280).toFixed(1) + ' mi';
+  return Math.max(50, Math.round(ft / 50) * 50) + ' ft';
+}
+
+function buzz() {
+  const phone = document.querySelector('.phone');
+  const tag = document.getElementById('buzz-tag');
+  phone.classList.add('buzzing');
+  tag.classList.add('on');
+  setTimeout(() => phone.classList.remove('buzzing'), 1000);
+  setTimeout(() => tag.classList.remove('on'), 2600);
+}
+
+// Driven by setInterval rather than requestAnimationFrame on purpose: rAF is
+// suspended whenever the tab isn't visible, which leaves the walkthrough
+// frozen the moment it's in a background tab — including on the machine of
+// whoever you sent the link to. Elapsed time is measured rather than assumed,
+// and clamped, so a throttled background tab resumes smoothly instead of
+// teleporting the truck.
+function driveFrame() {
+  if (!driveOn) return;
+  const now = performance.now();
+  const dt = Math.min((now - lastT) / 1000 || 0, 0.25);
+  lastT = now;
+
+  const leg = LEGS[legI];
+
+  if (holding > 0) {
+    holding -= dt * 1000;
+    if (holding <= 0) {
+      // Stop complete — advance
+      doneCount++;
+      legI = (legI + 1) % LEGS.length;
+      if (wtView === 'street') updateStreetView(Math.min(legI, REAL_ROUTE.length - 1));
+      if (legI === 0) doneCount = 2;        // loop back round
+      segI = 0; segT = 0;
+      document.getElementById('toast').classList.remove('show');
+    }
+    return;
+  }
+
+  // Advance along the current segment. Carry the overshoot into the next one
+  // rather than dropping it — and re-read the segment AFTER advancing, or the
+  // truck is drawn from the old segment's start point for a frame and appears
+  // to jump back to the beginning of the leg at every corner.
+  {
+    const a0 = leg.pts[segI], b0 = leg.pts[segI + 1];
+    segT += (SPEED_UNITS_S * dt) / segLen(a0, b0);
+  }
+  while (segT >= 1) {
+    segI++;
+    if (segI >= leg.pts.length - 1) {
+      segI = leg.pts.length - 2; segT = 1;
+      arrive(leg);
+      return;
+    }
+    const a1 = leg.pts[segI], b1 = leg.pts[segI + 1];
+    // convert the leftover fraction into the new segment's own scale
+    segT = (segT - 1) * segLen(leg.pts[segI - 1], leg.pts[segI]) / segLen(a1, b1);
+  }
+
+  const a = leg.pts[segI], b = leg.pts[segI + 1];
+  const x = a[0] + (b[0] - a[0]) * segT;
+  const y = a[1] + (b[1] - a[1]) * segT;
+  document.getElementById('wt-driver').setAttribute('cx', x.toFixed(1));
+  document.getElementById('wt-driver').setAttribute('cy', y.toFixed(1));
+
+  // Mirror the same progress onto the real map, so switching views mid-drive
+  // shows the truck in the same place on both.
+  if (realReady && realMarker) {
+    const total = LEGS.reduce((n, l) => n + l.pts.length - 1, 0);
+    const doneSegs = LEGS.slice(0, legI).reduce((n, l) => n + l.pts.length - 1, 0) + segI + segT;
+    const t = Math.min(doneSegs / total, 0.999) * (REAL_ROUTE.length - 1);
+    const i = Math.floor(t), f = t - i;
+    const A = REAL_ROUTE[i], B = REAL_ROUTE[Math.min(i + 1, REAL_ROUTE.length - 1)];
+    const pos = { lat: A.lat + (B.lat - A.lat) * f, lng: A.lng + (B.lng - A.lng) * f };
+    realMarker.setPosition(pos);
+    if (wtSat) realMap.panTo(pos);
+  }
+
+  const toEnd = distToLegEnd(leg, segI, segT);
+  const toTurn = segLen(a, b) * (1 - segT);
+
+  const banner = document.getElementById('turn-banner');
+  if (toEnd < ARRIVE_UNITS) {
+    const bl = leg.building || leg.pts[leg.pts.length - 1];
+    const side = sideOf([b[0] - a[0], b[1] - a[1]], [bl[0] - x, bl[1] - y]);
+    banner.classList.add('arriving');
+    document.getElementById('turn-arrow').textContent =
+      side === 'left' ? '⬅' : side === 'right' ? '➡' : '🏁';
+    document.getElementById('turn-dist').textContent = fmtFt(toEnd);
+    document.getElementById('turn-text').textContent = leg.stop;
+    document.getElementById('turn-next').textContent = sideLabel(side);
+  } else {
+    banner.classList.remove('arriving');
+    document.getElementById('turn-arrow').textContent = leg.icons[segI] || '↑';
+    document.getElementById('turn-dist').textContent = fmtFt(toTurn);
+    document.getElementById('turn-text').textContent = leg.turns[segI] || 'Continue';
+    document.getElementById('turn-next').textContent =
+      leg.turns[segI + 1] ? 'Then: ' + leg.turns[segI + 1] : 'Then: arrive at ' + leg.stop;
+  }
+
+  document.getElementById('wt-nav-count').textContent = (doneCount + 1) + ' of 5';
+  document.getElementById('wt-nav-eta').textContent =
+    '🚗 ' + Math.max(1, Math.round((toEnd * FT_PER_UNIT) / 60 / 60)) + ' min away';
+  document.getElementById('wt-nav-name').textContent = leg.stop;
+  document.getElementById('wt-nav-addr').textContent = leg.addr;
+  const noteEl = document.getElementById('wt-nav-note');
+  noteEl.textContent = leg.note;
+  noteEl.className = 'nav-note' + (leg.noteKind ? ' ' + leg.noteKind : '');
+
+  const bldg = leg.building || leg.pts[leg.pts.length - 1];
+  document.getElementById('wt-target').setAttribute('cx', bldg[0]);
+  document.getElementById('wt-target').setAttribute('cy', bldg[1]);
+}
+
+function arrive(leg) {
+  buzz();
+  const pts = leg.pts;
+  const last = [pts[pts.length-1][0] - pts[pts.length-2][0],
+                pts[pts.length-1][1] - pts[pts.length-2][1]];
+  const bl = leg.building || pts[pts.length - 1];
+  const side = sideOf(last, [bl[0] - pts[pts.length-1][0], bl[1] - pts[pts.length-1][1]]);
+  const sideBit = side !== 'ahead' ? ' · ' + sideLabel(side) : '';
+
+  toastHtml = 'Arrived at <b>' + leg.stop + '</b>?' + sideBit +
+              ' <button class="fake-done">✓ Done</button>';
+  const toast = document.getElementById('toast');
+  toast.innerHTML = toastHtml;
+  toast.classList.add('show');
+  document.getElementById('turn-arrow').textContent = '🏁';
+  document.getElementById('turn-dist').textContent = 'Arrived';
+  document.getElementById('turn-text').textContent = leg.stop;
+  document.getElementById('turn-next').textContent = '';
+  document.getElementById('turn-banner').classList.add('arriving');
+  setReadout('<b>' + leg.stop + '</b>' + (sideBit ? ',' + sideBit.replace(' — ', ' ') : '') +
+    '. The phone buzzed and asked, and it says which side to look — no hunting both curbs for a bin. One tap marks it done and the route moves on.');
+  holding = 2800;
+}
+
+/* Swaps the drawn ground beneath the route. Everything above it — the route
+   line, the truck, the target — stays put, so the view changes without the
+   drive loop knowing anything happened. */
+let wtSat = false;
+
+/* Both the chooser above the phone and the chip inside it drive this, so the
+   two can never disagree about which view is showing. */
+/* 'map' | 'sat' | 'street'. One place decides, so the chooser above the device
+   and the chips inside it can never disagree. */
+let wtView = 'map';
+
+window.setWtView = function (view) {
+  if (view === 'street' && !realReady) view = 'sat';    // nothing to show without imagery
+  wtView = view;
+  wtSat = view === 'sat';
+
+  const real   = document.getElementById('wt-realmap');
+  const drawn  = document.getElementById('wt-drawnmap');
+  const street = document.getElementById('wt-streetview');
+
+  street.style.display = view === 'street' ? '' : 'none';
+  if (realReady) {
+    real.style.display  = view === 'sat' ? '' : 'none';
+    drawn.style.display = view === 'map' ? '' : 'none';
+    if (view === 'sat' && realMap) google.maps.event.trigger(realMap, 'resize');
+  } else {
+    // No key: the drawing is all we have, so it stands in for both.
+    drawn.style.display = 'none' === street.style.display ? '' : '';
+    document.getElementById('wt-roads').style.display  = wtSat ? 'none' : '';
+    document.getElementById('wt-aerial').style.display = wtSat ? '' : 'none';
+  }
+
+  if (view === 'street') updateStreetView(Math.min(legI, REAL_ROUTE.length - 1));
+
+  document.getElementById('wt-sat')?.classList.toggle('on', view === 'sat');
+  document.getElementById('wt-sv')?.classList.toggle('on', view === 'street');
+  document.getElementById('pick-map')?.classList.toggle('on', view === 'map');
+  document.getElementById('pick-sat')?.classList.toggle('on', view === 'sat');
+  document.getElementById('pick-street')?.classList.toggle('on', view === 'street');
+
+  // Green route line vanishes against grass and aerial alike.
+  const route = document.getElementById('wt-route');
+  if (route) {
+    route.setAttribute('stroke', wtSat ? '#7dd3fc' : '#22c55e');
+    route.setAttribute('opacity', wtSat ? '1' : '0.9');
+  }
+};
+
+// kept so the older chip handler still works
+window.setWtSat = function (on) { setWtView(on ? 'sat' : 'map'); };
+window.toggleWtSat = function () { setWtView(wtView === 'sat' ? 'map' : 'sat'); };
+
+/* Put the panorama outside whichever stop the drive is heading for, looking
+   at it. Only re-queries when the stop changes — Street View lookups are
+   billed, and re-fetching every tick would be both slow and expensive. */
+function updateStreetView(stopIdx) {
+  if (!svPano || !svService || stopIdx === svStopIdx) return;
+  svStopIdx = stopIdx;
+
+  const stop = REAL_ROUTE[Math.min(stopIdx, REAL_ROUTE.length - 1)];
+  const at = { lat: stop.lat, lng: stop.lng };
+  const note = document.getElementById('sv-note');
+
+  const place = (data) => {
+    svPano.setPano(data.location.pano);
+    // Face the property rather than whatever direction the car was pointing.
+    const heading = google.maps.geometry?.spherical
+      ? google.maps.geometry.spherical.computeHeading(data.location.latLng, new google.maps.LatLng(at))
+      : 0;
+    svPano.setPov({ heading, pitch: 0 });
+    svPano.setVisible(true);
+    if (note) note.textContent = '';
+  };
+
+  svService.getPanorama({ location: at, radius: 80, source: 'outdoor' }, (d1, s1) => {
+    if (s1 === 'OK' && d1?.location) return place(d1);
+    svService.getPanorama({ location: at, radius: 350 }, (d2, s2) => {
+      if (s2 === 'OK' && d2?.location) return place(d2);
+      svPano.setVisible(false);
+      if (note) note.textContent = 'No Street View imagery near ' + stop.name + '.';
+    });
+  });
+}
+
+function setReadout(html) {
+  const el = document.getElementById('drive-readout');
+  if (el) el.innerHTML = html;
+}
+
+function startDrive() {
+  driveOn = true;
+  setPlaying(false);                       // scene timer off
+  view = 'map';
+  legI = 0; segI = 0; segT = 0; holding = 0; doneCount = 2;
+  done = new Set([4, 5]); pending = 0; toastHtml = ''; addingNoteRow = null;
+  renderScreen();
+  document.getElementById('turn-banner').classList.add('show');
+  setReadout('Driving to <b>Kestrel Bakery</b>. The map rides with the driver, the next turn sits on top, and the alert fires on its own at 80 meters.');
+  lastT = performance.now();
+  clearInterval(raf);
+  raf = setInterval(driveFrame, 60);
+}
+
+function stopDrive() {
+  driveOn = false;
+  clearInterval(raf);
+  raf = null;
+}
+
+function show(i) {
+  idx = (i + SCENES.length) % SCENES.length;
+  // Clear everything first: a scene declares the state it wants, and anything
+  // it leaves unset must not leak in from the scene before it.
+  view = SCENES[idx].view || 'stops';
+  turn = null;
+  toastHtml = '';
+  addingNoteRow = null;
+  pending = 0;
+  SCENES[idx].apply();
+  renderScreen();
+  renderNarration();
+}
+
+function tick() { show(idx + 1); }
+
+function setPlaying(on) {
+  playing = on;
+  clearInterval(timer);
+  timer = on ? setInterval(tick, SCENE_MS) : null;
+  document.getElementById('play').textContent = on ? '⏸ Pause' : '▶ Play';
+}
+
+document.getElementById('play').onclick = () => setPlaying(!playing);
+document.getElementById('next').onclick = () => { setPlaying(false); show(idx + 1); };
+document.getElementById('prev').onclick = () => { setPlaying(false); show(idx - 1); };
+document.getElementById('replay').onclick = () => { show(0); setPlaying(true); };
+document.getElementById('dots').onclick = (e) => {
+  const d = e.target.closest('.dot');
+  if (d) { setPlaying(false); show(Number(d.dataset.i)); }
+};
+
+const driveEls = ['scene-no', 'scene-title', 'scene-body', 'dots'];
+function setMode(m) {
+  const drive = m === 'drive';
+  document.getElementById('mode-drive').classList.toggle('on', drive);
+  document.getElementById('mode-steps').classList.toggle('on', !drive);
+  driveEls.forEach(id => { document.getElementById(id).hidden = drive; });
+  document.querySelector('.controls').hidden = drive;
+  document.getElementById('drive-readout').hidden = !drive;
+  if (drive) startDrive();
+  else { stopDrive(); show(0); setPlaying(true); }
+}
+document.getElementById('mode-drive').onclick = () => setMode('drive');
+document.getElementById('mode-steps').onclick = () => setMode('steps');
+
+show(0);
+setMode('drive');
+</script>
+
+</body>
+</html>

@@ -1,0 +1,178 @@
+/* ============================================================
+   tokens.css — the one place corner radii are defined.
+   Linked by every page, before that page's own <style> block,
+   so a page can still override any token in its own :root.
+
+   Roles, not sizes. Pick the role that matches what the element
+   IS, and the scale keeps the whole site consistent:
+
+     --r-chip     inline labels, badges, swatches, tiny tags
+     --r-control  inputs, selects, small buttons
+     --r-card     cards, table wrappers, callouts
+     --r-panel    large containers, modals, sections
+     --r-sheet    bottom sheets / full-width overlays
+     --r-pill     fully rounded (buttons, counters)
+     --r-circle   avatars, dots, icon buttons
+
+   Three presets. Set on <html>:
+     (none)                  standard — driver app + product pages
+     data-radius="tight"     analysis/report pages (crisper, print-like)
+     data-radius="soft"      marketing/deck pages (rounder)
+   ============================================================ */
+
+/* Incident buttons on the driver's stop card. The style editor overrides
+   these on :root; what is here is what a page shows before the settings
+   arrive, or if they never do. */
+:root {
+  --report-bg-contamination: #425512;
+  --report-bg-overflow:      #194B0C;
+  --report-bg-skip:          #085B30;
+  --report-bg-photo:         #004E2E;
+  --report-btn-bg:          #085B30;
+  --report-btn-text:        #ffffff;
+  --report-btn-border:      #d7e0d9;
+  --report-btn-radius:      36px;
+  --report-btn-height:      88px;
+  --report-btn-min-width:   104px;
+  --report-btn-gap:         20px;
+  --report-row-space:       22px;
+  --note-edit-text:         #14241b;
+  --note-edit-height:       96px;
+  --report-btn-icon-size:   28px;
+  --report-btn-font-size:   13px;
+  --report-btn-font-weight: 600;
+  --report-btn-font-style:  normal;
+}
+
+:root {
+  --r-chip:    4px;
+  --r-control: 6px;
+  --r-card:    9px;
+  --r-panel:   12px;
+  --r-sheet:   20px;
+
+  --r-pill:    999px;
+  --r-circle:  50%;
+}
+
+:root[data-radius="tight"] {
+  --r-chip:    3px;
+  --r-control: 4px;
+  --r-card:    6px;
+  --r-panel:   8px;
+  --r-sheet:   12px;
+}
+
+/* The paint button injected by styles.js on pages carrying
+   <html data-style-button>. Defined here rather than per page so it looks the
+   same everywhere and there is one place to change it. */
+.style-link {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 900;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  line-height: 1;
+  text-decoration: none;
+  border-radius: var(--r-circle);
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #d4e8d8);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
+  opacity: 0.55;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.style-link:hover,
+.style-link:focus-visible { opacity: 1; transform: translateY(-1px); }
+
+@media print { .style-link { display: none; } }
+
+:root[data-radius="soft"] {
+  --r-chip:    6px;
+  --r-control: 10px;
+  --r-card:    14px;
+  --r-panel:   18px;
+  --r-sheet:   28px;
+}
+
+
+/* ============================================================
+   PALETTES
+
+   Same idea as the corner scale: the page says which family it
+   belongs to, the token file holds the actual colours.
+
+   Set on <html> alongside data-radius:
+     <html lang="en" data-radius="tight" data-palette="report">
+
+   NOTE: data-theme is already taken — pages use it for the
+   light/dark override — so family selection lives on
+   data-palette. Each palette below defines light, then the two
+   dark selectors (system preference, and the explicit toggle).
+
+   "report" — the analysis/briefing pages. This palette was
+   copy-pasted into six pages x three blocks = 18 copies;
+   briefing/hub/routing/streetview/weekly were byte-identical
+   and aspenone had drifted a few shades off for no reason
+   (#f6f8f6 vs #f7f8f6, #dce4de vs #dde3d9, and so on).
+   ============================================================ */
+
+[data-palette="report"] {
+  --bg:        #f7f8f6;
+  --surface:   #ffffff;
+  --surface-2: #f0f3ef;
+  --border:    #dde3d9;
+  --forest:    #1b3a2a;
+  --accent:    #2d7d4f;
+  --accent-l:  #e3f0e8;
+  --text:      #1c2a21;
+  --muted:     #64786b;
+  --amber:     #b45309;
+  --amber-l:   #fdf0dc;
+  --red:       #b91c1c;
+  --red-l:     #fde8e8;
+  --blue:      #1e4e79;
+  --blue-l:    #e4edf5;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-palette="report"]:not([data-theme="light"]) {
+    --bg:        #0d1410;
+    --surface:   #161f19;
+    --surface-2: #1b2620;
+    --border:    #253328;
+    --forest:    #a8d5bb;
+    --accent:    #5cb37f;
+    --accent-l:  #16311f;
+    --text:      #e4ede7;
+    --muted:     #7d9686;
+    --amber:     #e0a35c;
+    --amber-l:   #2e2113;
+    --red:       #f08b8b;
+    --red-l:     #33191a;
+    --blue:      #8fbadd;
+    --blue-l:    #14242f;
+  }
+}
+
+[data-palette="report"][data-theme="dark"] {
+  --bg:        #0d1410;
+  --surface:   #161f19;
+  --surface-2: #1b2620;
+  --border:    #253328;
+  --forest:    #a8d5bb;
+  --accent:    #5cb37f;
+  --accent-l:  #16311f;
+  --text:      #e4ede7;
+  --muted:     #7d9686;
+  --amber:     #e0a35c;
+  --amber-l:   #2e2113;
+  --red:       #f08b8b;
+  --red-l:     #33191a;
+  --blue:      #8fbadd;
+  --blue-l:    #14242f;
+}

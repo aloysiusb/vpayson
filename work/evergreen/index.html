@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Route driver application — Virginia P. Payson</title>
+<meta name="description" content="A progressive web app that put a compost hauler's routes on drivers' phones, synced live against the spreadsheet the office already used. Node, Express, WebSockets, Google Sheets. Interactive walkthrough with sample data.">
+<link rel="canonical" href="https://vpayson.com/work/evergreen/">
+<meta property="og:title" content="Route driver application — built for a Roaring Fork Valley compost hauler">
+<meta property="og:description" content="Live route sync to drivers' phones, turn-by-turn navigation, notes and photos back to the office. Try the interactive walkthrough.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%231f5c47'/><text y='.72em' x='50%25' text-anchor='middle' font-size='62' font-family='system-ui' fill='%23fff'>V</text></svg>">
+
+<style>
+/* Same tokens as the home page — one system, two pages. */
+:root{
+  --hue: 158;
+  --chroma: .06;
+
+  --ink:        oklch(22% .02 var(--hue));
+  --ink-soft:   oklch(42% .015 var(--hue));
+  --ink-faint:  oklch(58% .012 var(--hue));
+  --paper:      oklch(99% .004 var(--hue));
+  --paper-alt:  oklch(96.5% .008 var(--hue));
+  --rule:       oklch(89% .012 var(--hue));
+  --brand:      oklch(43% var(--chroma) var(--hue));
+  --brand-soft: oklch(95% .022 var(--hue));
+  --accent:     oklch(55% .13 48);
+
+  --measure: 34rem;
+  --gutter: clamp(1.25rem, 5vw, 4rem);
+  --shell: 62rem;
+
+  --step--1: clamp(.82rem, .79rem + .14vw, .89rem);
+  --step-0:  clamp(1rem, .96rem + .2vw, 1.09rem);
+  --step-1:  clamp(1.2rem, 1.12rem + .4vw, 1.45rem);
+  --step-2:  clamp(1.55rem, 1.36rem + .95vw, 2.15rem);
+  --step-3:  clamp(2.1rem, 1.6rem + 2.5vw, 3.6rem);
+
+  --font: "Google Sans Flex", "Google Sans", ui-sans-serif, system-ui,
+          -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:        oklch(93% .012 var(--hue));
+    --ink-soft:   oklch(75% .014 var(--hue));
+    --ink-faint:  oklch(60% .012 var(--hue));
+    --paper:      oklch(17% .014 var(--hue));
+    --paper-alt:  oklch(21% .018 var(--hue));
+    --rule:       oklch(30% .018 var(--hue));
+    --brand:      oklch(78% .09 var(--hue));
+    --brand-soft: oklch(26% .03 var(--hue));
+    --accent:     oklch(72% .12 48);
+  }
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--font); font-size:var(--step-0); line-height:1.6;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+h1,h2,h3{line-height:1.14; margin:0; font-weight:600; letter-spacing:-.02em; text-wrap:balance}
+p{margin:0; text-wrap:pretty}
+a{color:inherit}
+:focus-visible{outline:2.5px solid var(--accent); outline-offset:3px; border-radius:2px}
+
+.shell{max-width:var(--shell); margin-inline:auto; padding-inline:var(--gutter)}
+
+/* Breadcrumb */
+.crumb{padding-block:1.5rem .5rem; font-size:var(--step--1); color:var(--ink-faint)}
+.crumb a{color:var(--brand); text-decoration-thickness:1px; text-underline-offset:.2em}
+
+/* Hero */
+.hero{padding-block:clamp(1.5rem,5vh,3rem) clamp(2rem,6vh,3.5rem)}
+.eyebrow{
+  font-size:var(--step--1); font-weight:600; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--brand); margin:0 0 1.2rem;
+}
+.hero h1{font-size:var(--step-3); max-width:22ch}
+.lede{font-size:var(--step-1); color:var(--ink-soft); max-width:var(--measure); margin-block-start:1.5rem}
+
+/* The call to action, which is the point of the page */
+.try{
+  display:flex; flex-wrap:wrap; gap:.9rem; align-items:center;
+  margin-block-start:2.2rem;
+}
+.btn{
+  display:inline-block; background:var(--brand); color:var(--paper);
+  font-weight:600; font-size:var(--step-0);
+  padding:.85rem 1.5rem; border-radius:99px; text-decoration:none;
+  transition:transform .16s ease, background .16s ease;
+}
+.btn:hover,.btn:focus-visible{background:var(--accent); transform:translateY(-1px)}
+.btn-note{font-size:var(--step--1); color:var(--ink-faint); max-width:26ch}
+
+/* Facts strip */
+.facts{
+  display:grid; gap:1.5rem; grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));
+  padding-block:clamp(2rem,5vh,3rem);
+}
+.fact dt{font-size:var(--step--1); color:var(--ink-faint); margin-block-end:.3rem}
+.fact dd{margin:0; font-weight:500; color:var(--ink-soft); font-size:var(--step--1)}
+.fact dd code{font-family:var(--mono); font-size:.92em}
+
+section{padding-block:clamp(2.5rem,6vh,4rem)}
+.band{background:var(--paper-alt); border-block:1px solid var(--rule)}
+.section-head{
+  font-size:var(--step--1); font-weight:600; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-faint); margin:0 0 1.75rem;
+}
+.prose{max-width:var(--measure); display:grid; gap:1.1rem}
+.prose h3{font-size:var(--step-1); margin-block-start:1rem}
+.prose p{color:var(--ink-soft)}
+.prose strong{color:var(--ink); font-weight:600}
+
+/* Problem → solution pairs */
+.pairs{display:grid; gap:1.5rem; grid-template-columns:repeat(auto-fit,minmax(16rem,1fr))}
+.pair{border-block-start:2px solid var(--brand); padding-block-start:1rem}
+.pair h3{font-size:var(--step-0); margin-block-end:.45rem}
+.pair p{font-size:var(--step--1); color:var(--ink-soft)}
+
+/* Code-ish callout */
+.note{
+  border-inline-start:3px solid var(--brand); padding:.2rem 0 .2rem 1.1rem;
+  color:var(--ink-soft); font-size:var(--step--1); max-width:var(--measure);
+}
+.note code{font-family:var(--mono); font-size:.92em; color:var(--ink)}
+
+footer{
+  padding-block:2.25rem 3rem; border-block-start:1px solid var(--rule);
+  font-size:var(--step--1); color:var(--ink-faint);
+  display:flex; flex-wrap:wrap; gap:.4rem 1.5rem; justify-content:space-between;
+}
+footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickness:1px}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation:none !important; transition:none !important}
+}
+</style>
+</head>
+<body>
+
+<main>
+
+  <nav class="crumb shell" aria-label="Breadcrumb">
+    <a href="/">Virginia P. Payson</a> &rsaquo; Route driver application
+  </nav>
+
+  <header class="hero shell">
+    <p class="eyebrow">Application &middot; Roaring Fork Valley, Colorado</p>
+    <h1>Putting a hauler's routes on the drivers' phones</h1>
+    <p class="lede">
+      A compost and waste hauler ran its routes off a shared spreadsheet, printed
+      each morning. I built a progressive web app that reads that same
+      spreadsheet live, so drivers work from their phones and the office sees
+      progress as it happens — without anybody learning a new system.
+    </p>
+    <div class="try">
+      <a class="btn" href="walkthrough.html">Try the walkthrough &rarr;</a>
+      <p class="btn-note">Plays in your browser. Sample data — no real routes,
+         no sign-in.</p>
+    </div>
+  </header>
+
+  <div class="band">
+    <dl class="facts shell">
+      <div class="fact">
+        <dt>Role</dt>
+        <dd>Sole designer and developer</dd>
+      </div>
+      <div class="fact">
+        <dt>Built with</dt>
+        <dd>Node, Express, <code>ws</code> WebSockets, Google Sheets API, vanilla JS</dd>
+      </div>
+      <div class="fact">
+        <dt>Shape</dt>
+        <dd>Installable PWA — no app store, no download</dd>
+      </div>
+      <div class="fact">
+        <dt>Status</dt>
+        <dd>In daily use on live routes</dd>
+      </div>
+    </dl>
+  </div>
+
+  <section class="shell">
+    <h2 class="section-head">The problem</h2>
+    <div class="prose">
+      <p>
+        The office kept every route in one Google Sheet — a tab per day, a row
+        per stop, with addresses, driving directions and the notes that actually
+        matter: <strong>the dog, the blocked bin, the gate you need a code
+        for.</strong> Each morning it was printed and handed out.
+      </p>
+      <p>
+        That works until it doesn't. A paper route can't be reordered when a
+        customer calls at 9am. A driver who finds a new gate code writes it on
+        the sheet in the cab, where nobody else ever sees it. And the office has
+        no idea how far along the truck is without ringing the driver — which
+        means ringing a driver who is driving.
+      </p>
+      <p>
+        The obvious answer is a fleet management platform. The obvious answer
+        was wrong: it meant a monthly licence, a migration away from the
+        spreadsheet the office had spent years getting right, and retraining
+        everybody. <strong>The spreadsheet wasn't the problem. Printing it
+        was.</strong>
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell">
+      <h2 class="section-head">What I built instead</h2>
+      <div class="pairs">
+        <div class="pair">
+          <h3>The sheet stays the system of record</h3>
+          <p>The office keeps working exactly as before. The app reads the same
+             tabs and writes back to the same cells, so there was no migration
+             and nothing to re-learn. Delete the app and the business still
+             runs.</p>
+        </div>
+        <div class="pair">
+          <h3>Live both ways</h3>
+          <p>A WebSocket connection means a stop marked done on a phone shows in
+             the office within a second, and a route reordered in the sheet
+             reaches the truck without the driver reloading anything.</p>
+        </div>
+        <div class="pair">
+          <h3>Turn-by-turn, in the app</h3>
+          <p>Navigation, satellite and Street View for the stop the driver is
+             actually approaching — so they can see which side of the road the
+             bin is on before they get there.</p>
+        </div>
+        <div class="pair">
+          <h3>Notes and photos go home</h3>
+          <p>Anything the driver notices — a gate code, a blocked bin, a
+             customer request — lands back in the sheet the office already
+             reads. Photos upload from the cab and the link goes in the row.</p>
+        </div>
+        <div class="pair">
+          <h3>A phone in a cab, not a desktop app</h3>
+          <p>Installs to the home screen, works one-handed, targets sized for
+             gloves. Drivers get it by text message — a link, not an app store
+             listing and a password reset.</p>
+        </div>
+        <div class="pair">
+          <h3>A customer portal too</h3>
+          <p>Customers request a hold or a pickup change themselves. Requests
+             queue for approval rather than landing straight in the route, so
+             the office stays in control.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="shell">
+    <h2 class="section-head">The part I am most pleased with</h2>
+    <div class="prose">
+      <p>
+        That spreadsheet has billing in it. Rates, account notes, customer
+        movement — things a driver's phone has no business displaying, and that
+        no app should be one bug away from leaking.
+      </p>
+      <p>
+        So the server holds an <strong>explicit allow-list of the only fields
+        that may ever reach a driver's screen</strong>, and a list of tabs that
+        are off limits entirely. Anything not named is dropped before the
+        response is built.
+      </p>
+      <div class="note">
+        <code>ALLOWED_STOP_FIELDS</code> is a whitelist, not a blacklist. If
+        somebody adds a <code>Rate</code> column to the sheet next year, the app
+        cannot show it — not because anyone remembered to hide it, but because
+        nothing is visible until it is named.
+      </div>
+      <p>
+        That is the whole approach in one file. <strong>Make the safe thing the
+        default and the unsafe thing impossible</strong>, rather than trusting a
+        future edit to be careful.
+      </p>
+
+      <h3>And it degrades</h3>
+      <p>
+        Drivers lose signal in this valley — that is a fact about the terrain,
+        not an edge case. Work queues locally and syncs when service returns.
+        The walkthrough on this site is the same idea taken further: it has no
+        server behind it at all, so it still plays on bad hotel wifi in front of
+        somebody, years from now, with nothing upstream alive.
+      </p>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="shell">
+      <h2 class="section-head">Why it is here</h2>
+      <div class="prose">
+        <p>
+          This is what I mean when I say I build things to be handed over.
+          No framework, no build step, no licence to lapse. Plain JavaScript,
+          a documented server, and a data model that is a spreadsheet the client
+          already owns and understands.
+        </p>
+        <p>
+          It is also local. Keeping compost out of a landfill in the Roaring
+          Fork Valley is a small operation with real routes and real trucks, and
+          the useful software for it was never going to arrive from a vendor in
+          another state.
+        </p>
+      </div>
+      <div class="try">
+        <a class="btn" href="walkthrough.html">Try the walkthrough &rarr;</a>
+        <p class="btn-note">Two minutes. Switch between map, satellite and
+           Street View.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="shell">
+  <span>&copy; <span id="y">2026</span> Virginia P. Payson &middot; Basalt, Colorado</span>
+  <span><a href="/">All work</a> &middot; <a href="mailto:v.p.payson@gmail.com">v.p.payson@gmail.com</a></span>
+</footer>
+
+<script>document.getElementById('y').textContent=new Date().getFullYear()</script>
+</body>
+</html>

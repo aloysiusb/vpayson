@@ -1,0 +1,1680 @@
+:root {
+  --route-color: #22c55e;
+  --route-color-dark: color-mix(in srgb, var(--route-color) 80%, black);
+  --route-color-light: color-mix(in srgb, var(--route-color) 20%, white);
+  --route-card-text: #ffffff;
+  --bg: #0f1612;
+  --surface: #17201a;
+  --border: #2a372e;
+  --text: #e5ece7;
+  --text-muted: #8ea395;
+
+  /* Home header */
+  --home-header-bg: #17201a;
+  --home-header-text: #e5ece7;
+  --home-header-padding: 36px;
+  --home-heading-font-size: 22px;
+  --home-heading-font-weight: 800;
+  --home-subhead-font-size: 14px;
+  --home-subhead-font-weight: 400;
+
+  /* Route cards */
+  --route-card-radius: 16px;
+
+  /* Route header */
+  --route-header-text: #f2f7f4;
+  --route-title-font-size: 22px;
+  --route-title-font-weight: 700;
+  --progress-bar-fill: #63b681;
+
+  /* Section headers */
+  --section-header-font-size: 11.5px;
+  --section-header-font-weight: 700;
+  --completed-section-bg: #e6f0e9;
+  --completed-section-text: #2f6b46;
+  --completed-section-border: #c4dccd;
+
+  /* Stop card — its own background and text, NOT --surface, which paints
+     eleven other things. The card is a light sheet on a dark page, so the
+     text inside it takes the card's colour rather than the page's. */
+  --stop-card-bg: #ffffff;
+  --stop-card-text: #16211a;
+
+  /* Stop card */
+  --stop-account-font-size: 16px;
+  --stop-account-font-weight: 600;
+  --stop-address-font-size: 13px;
+  --stop-address-font-weight: 400;
+  --stop-done-bg: #e6f0e9;
+  --stop-done-border: #c4dccd;
+
+  /* Note chips */
+  --urgent-bg: #fbe4df;
+  --urgent-text: #8c3322;
+  --hold-bg: #fbf0d9;
+  --hold-text: #7a5210;
+  --stop-note-font-size: 13px;
+  --stop-note-font-weight: 400;
+
+  /* Note textarea */
+  --note-edit-bg: #ffffff;
+  --note-edit-font-size: 13px;
+  --note-edit-font-weight: 400;
+
+  /* Done button */
+  --done-btn-bg: #2d7d4f;
+  --done-btn-text: #f2f7f4;
+  --done-btn-done-bg: #3f5f52;
+
+  /* Map / Directions buttons */
+  --action-btn-bg: #f2f5f2;
+  --action-btn-text: #5d7065;
+  --action-btn-border: #d7e0d9;
+  --action-btn-font-size: 12px;
+  --action-btn-font-weight: 500;
+
+  /* Bottom action bar */
+  --action-bar-bg: #131c16;
+
+  /* Primary button */
+  --primary-btn-text: #f2f7f4;
+  --primary-btn-font-size: 14px;
+  --primary-btn-font-weight: 600;
+
+  /* Toast */
+  --toast-bg: #e5ece7;
+  --toast-text: #14241b;
+  --toast-font-size: 13px;
+  --toast-font-weight: 400;
+
+  /* Global typography */
+  --font-size: 16px;
+  --font-weight: 400;
+  --line-height: 1.5;
+  --font: 'IBM Plex Sans', system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: 'Source Serif 4', Georgia, serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  font-size: var(--font-size);
+  font-weight: var(--font-weight);
+  line-height: var(--line-height);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Headers ──
+   Both bars stay put while the stops list scrolls: the app bar at the top, the
+   route line directly under it. Stacked with a variable rather than a literal
+   because the app bar's height depends on its font, and a wrong number here
+   leaves either a gap between them or the route name tucked behind the nav.
+   setBarOffsets() in map.js measures it.
+
+   Scoped to app.css on purpose — chrome.css carries the app bar to eight other
+   pages, and making every one of them sticky is not what was asked for. */
+.app-bar {
+  position: sticky;
+  top: 0;
+  z-index: 110;          /* above the route line, which slides under it */
+}
+
+/* One row, then a hairline progress bar. 20px of top padding and four stacked
+   blocks is what made this a quarter of a phone screen. */
+.route-header {
+  background: var(--route-color);
+  color: var(--route-header-text);
+  padding: 3px 12px 0;
+  position: sticky;
+  top: var(--appbar-h, 40px);
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.route-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;      /* was 48; the tabs inside set the real floor */
+}
+
+/* Name and day/date share a column and stay on one line, truncating rather
+   than wrapping — a wrapped route name is what pushed this header to two rows. */
+.route-ident {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.route-ident .route-title {
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.route-meta {
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  opacity: 0.85;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* The hamburger. Hidden until the line runs out of room; see the media query
+   at the end of this file. */
+.hdr-menu {
+  display: none;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--r-circle, 999px);
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.hdr-menu:hover { background: rgba(255,255,255,0.32); }
+.hdr-menu[aria-expanded="true"] { background: rgba(255,255,255,0.95); color: var(--route-color-dark, #166534); }
+
+.hdr-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0 10px;
+}
+.hdr-drawer[hidden] { display: none; }
+.hdr-drawer a {
+  color: #fff;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 11px 12px;
+  border-radius: var(--r-card);
+  background: rgba(255,255,255,0.14);
+}
+.hdr-drawer a:hover { background: rgba(255,255,255,0.28); }
+.hdr-drawer-meta { font-size: 12px; opacity: 0.85; padding: 4px 12px 0; }
+
+.home-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Was 36. Reached for with a glove on, in a moving truck. */
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-circle);
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+  font-size: 20px;
+  text-decoration: none;
+  flex-shrink: 0;
+  margin-right: 10px;
+  line-height: 1;
+}
+.home-btn:hover { background: rgba(255,255,255,0.32); }
+
+/* .route-nav held a ⌂ and a 📡 at the left of the route line. Both went to
+   pages the app bar above already links to by name, and the app bar is sticky
+   now, so they were two more things to look at for no new destination.
+   .home-btn itself stays — the walkthrough still draws one. */
+
+/* ── View tabs (Stops / Map) ──
+   On the header line now rather than a row of their own, so they are sized to
+   the line: smaller than the full-width pair they were, and still the most
+   obvious control on it. */
+.view-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.14);
+  border-radius: var(--r-card);
+}
+.view-tab {
+  flex: 1;
+  min-height: 34px;
+  padding: 5px 12px;
+  border: none;
+  border-radius: var(--r-card);
+  background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.75);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.view-tab.active {
+  background: rgba(255,255,255,0.95);
+  color: var(--route-color-dark, #166534);
+}
+
+/* ── Map view ── */
+#view-map { position: relative; }
+
+/* The map's own interface — head-up display, dock, zoom slider, hazard picker
+   — lives in css/map-ui.css, because the public demo draws the same thing and
+   a second copy here is how the two would drift apart.
+
+   Two rules differ HERE, and only here, because this page's map fills the
+   screen while the demo's sits inside one.
+
+   The dock is fixed to the window rather than to the map. Hung off the map it
+   inherited every mistake the map's height made, and on a phone — where
+   innerHeight counts the strip behind the address bar — that put the whole
+   dock below the fold, under the action bar, where a driver saw "Start My Day"
+   where the controls should have been. --dock-bottom is the action bar's real
+   height plus a gap, measured by sizeMap(). */
+#map-dock {
+  position: fixed;
+  bottom: var(--dock-bottom, 100px);
+}
+/* And the picker that opens from it sits above it. The dock's height is not a
+   constant — it is one row on a desktop and two on a phone — so the clearance
+   is measured when the picker opens rather than guessed at here. */
+#hazard-picker {
+  position: fixed;
+  bottom: var(--picker-bottom, 220px);
+}
+
+.view-tab:disabled { opacity: 0.4; cursor: default; }
+
+/* The route time and the traffic, and any message the app has for the driver.
+   It has moved twice for good reasons. It began as a line of text in the map's
+   button bar; when that bar went it was left a bare white span on a white
+   page, invisible. Then it became a toast floating above the dock — readable,
+   but at the foot of the map, which put the one readout a driver glances at
+   furthest from everything else they glance at.
+   It sits on the head-up display's line now, beside the compass. */
+#optimize-status {
+  /* flex-start, not center: the compass sits at the top of the display and the
+     directions below run long, so centring on the row put this level with the
+     middle of the directions rather than level with the rose. */
+  align-self: flex-start;
+  margin-top: 10px;
+  /* Pushed to the far end of the compass's row. */
+  margin-left: auto;
+  flex-shrink: 0;
+  max-width: 58%;
+  padding: 6px 11px;
+  border-radius: var(--r-pill, 999px);
+  background: rgba(17, 22, 17, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  pointer-events: none;
+}
+#optimize-status:empty { display: none; }
+
+.nav-mode-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: var(--r-pill);
+  vertical-align: middle;
+  margin-left: 4px;
+}
+.nav-mode-badge.planned { background: #dcfce7; color: #15803d; }
+.nav-mode-badge.live    { background: #fef3c7; color: #b45309; }
+
+/* The map fills what is actually left, which is the screen minus three things:
+   the app bar (39), the header line (60) and the FIXED action bar at the foot
+   (89). That last one is easy to forget because it is fixed and so takes no
+   space in the flow — the map happily ran 89px underneath it, which put the
+   dock's captions behind "Start My Day" where nobody could read or tap them.
+
+   This calc is the fallback. sizeMap() in map.js then sets the exact height
+   from where the map actually starts and where the action bar actually begins,
+   because those depend on the header, which depends on the route name — and a
+   magic number here goes wrong the next time any of that changes. */
+#route-map {
+  width: 100%;
+  height: calc(100vh - 190px);
+  height: calc(100dvh - 190px);
+  min-height: 180px;
+}
+
+/* A pill in the middle of the map, not a full-width opaque band 60px down.
+   The 60px was measured from the top of the old layout, where the directions
+   sat above the map; now that they are an overlay it landed across the map's
+   face. And at z-index 10 it outranked the head-up display, so while stops
+   were being located the compass and the next turn were behind it. */
+#map-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 12px 20px;
+  border-radius: var(--r-pill, 999px);
+  text-align: center;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(14, 18, 15, 0.86);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.35);
+  z-index: 4;                 /* under the HUD and the dock, over the map */
+}
+
+/* ── Nav card ── */
+#nav-card {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  /* The foot has to clear the dock. The dock is position:fixed so it floats
+     over everything, including this card once a driver scrolls down to it —
+     and this card got a lot taller when its report buttons became the route
+     side's full-size round seven. Without the room, the last row of them sits
+     under the tray where it cannot be tapped. */
+  padding: 14px 16px calc(var(--dock-bottom, 100px) + 96px);
+  position: relative;
+}
+
+.nav-progress-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.nav-stop-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 2px;
+  line-height: 1.3;
+}
+
+.nav-stop-addr {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.nav-note {
+  font-size: 13px;
+  background: var(--route-color-light, #dcfce7);
+  border-left: 3px solid var(--route-color, #22c55e);
+  padding: 7px 10px;
+  border-radius: 0 var(--r-card) var(--r-card) 0;
+  color: var(--text);
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.nav-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.nav-btn {
+  flex: 1;
+  padding: 10px 6px;
+  border: none;
+  border-radius: var(--r-card);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  text-align: center;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-btn:disabled { opacity: 0.35; cursor: default; }
+
+.nav-btn-prev, .nav-btn-next {
+  background: var(--border);
+  color: var(--text);
+  flex: 0.7;
+}
+
+.nav-btn-maps {
+  background: #dbeafe;
+  color: #1d4ed8;
+  flex: 0.9;
+}
+
+.nav-btn-done {
+  background: var(--route-color, #22c55e);
+  color: #fff;
+  flex: 1.2;
+}
+
+.nav-btn-undo {
+  background: #fee2e2;
+  color: #dc2626;
+  flex: 1.2;
+}
+
+/* ── Access / directions chip ── */
+/* ── Field labels ──
+   Three things on the map screen read as "directions": Google's live
+   turn-by-turn in the banner, the sheet's "Direction" column (gate codes and
+   which drive to take) and the driver note. Only the banner says where to go.
+   A small caps label in front of the two sheet fields is enough to tell them
+   apart without touching anybody's spreadsheet. */
+.field-label {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  margin-right: 7px;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+.nav-access-chip, .stop-access-chip {
+  font-size: 12px;
+  font-weight: 600;
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-radius: var(--r-card);
+  padding: 5px 10px;
+  margin-bottom: 6px;
+  display: inline-block;
+  line-height: 1.4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .nav-access-chip,
+  :root:not([data-theme="light"]) .stop-access-chip {
+    background: #1e3a5f;
+    color: #93c5fd;
+  }
+}
+:root[data-theme="dark"] .nav-access-chip,
+:root[data-theme="dark"] .stop-access-chip {
+  background: #1e3a5f;
+  color: #93c5fd;
+}
+
+/* ── Note styles by urgency ── */
+/* ── Navigation app picker ── */
+/* On the map, on the compass's line — not at the foot of the page.
+   It was built inside the stop card, which lives below the map, so tapping
+   Navigate opened it down among the report buttons: the furthest point on the
+   screen from where the driver was looking, and right where contamination,
+   bear and skip are. Absolute inside #map-wrap puts it where the compass is,
+   over the map, with the same scrim the rest of the head-up display uses. */
+#nav-app-picker {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  right: 12px;
+  /* Above the head-up display (6) and the hazard picker (7): it is the thing
+     the driver just asked for, and it is only up while they are choosing. */
+  z-index: 8;
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  padding: 6px;
+  border-radius: var(--r-card);
+  background: rgb(18 26 21 / 0.82);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.35);
+}
+#nav-app-picker[hidden] { display: none; }
+
+.nav-app-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border: 1px solid rgb(255 255 255 / 0.22);
+  border-radius: var(--r-control);
+  background: rgb(255 255 255 / 0.1);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: center;
+}
+.nav-app-btn:active { transform: scale(0.97); }
+
+/* How many stops the Google handoff covers. Quieter than the app's name,
+   because it is the answer to a second question. */
+.nav-app-sub {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.nav-app-close {
+  flex: 0 0 auto;
+  width: 34px;
+  border: none;
+  border-radius: var(--r-control);
+  background: rgb(255 255 255 / 0.1);
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.nav-eta {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-radius: var(--r-control);
+  padding: 2px 7px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .nav-eta { background: #1e3a5f; color: #93c5fd; }
+}
+:root[data-theme="dark"] .nav-eta { background: #1e3a5f; color: #93c5fd; }
+
+.nav-note         { font-size: 13px; background: var(--route-color-light, #dcfce7); border-left: 3px solid var(--route-color, #22c55e); padding: 7px 10px; border-radius: 0 var(--r-card) var(--r-card) 0; color: var(--text); margin-bottom: 8px; line-height: 1.5; }
+.nav-note.urgent  { background: #fee2e2; border-left-color: #dc2626; }
+.nav-note.hold    { background: #fef3c7; border-left-color: #d97706; }
+
+/* ── Report quick buttons ── */
+/* .nav-report-btns and .report-quick-btn lived here: four rectangular buttons
+   that only looked like the route side's seven round ones, and were missing
+   Both, Bear and Locked entirely. The card draws the real ones now, from the
+   same builder the stop list uses — see stopReportRowHtml in driver.js. */
+
+
+/* ── Report panel ── */
+#report-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+#report-overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+#report-panel {
+  width: 100%;
+  background: var(--surface);
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+  transform: translateY(100%);
+  transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+#report-overlay.open #report-panel {
+  transform: translateY(0);
+}
+#report-handle {
+  width: 40px; height: 4px;
+  background: var(--border);
+  border-radius: var(--r-pill);
+  margin: 10px auto 0;
+}
+.report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.report-title { font-size: 17px; font-weight: 700; }
+.report-close-btn {
+  background: none; border: none; font-size: 18px;
+  color: var(--text-muted); cursor: pointer; padding: 4px 8px;
+}
+.report-progress {
+  display: flex; gap: 6px; padding: 12px 16px 0; justify-content: center;
+}
+.report-dot {
+  width: 8px; height: 8px; border-radius: var(--r-circle);
+  background: var(--border); transition: background 0.2s;
+}
+.report-step-label {
+  font-size: 14px; font-weight: 600; color: var(--text-muted);
+  padding: 14px 16px 8px; text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px;
+}
+.report-options {
+  display: flex; flex-direction: column; gap: 8px; padding: 0 16px;
+}
+/* Pills, to match the round buttons that opened this panel. Not circles —
+   "Recyclables mixed in" has to stay readable, and a circle is a hostile
+   container for a phrase. Same language, right shape for the content. */
+.report-option {
+  padding: 15px 20px;
+  border: 2px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: center;
+  transition: all 0.12s;
+}
+/* The chosen one fills with the colour of the report being filed — set
+   inline by renderStep, so it is always the same colour as the circle. */
+.report-option.selected {
+  font-weight: 700;
+  border-color: transparent;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
+}
+.report-option:active { transform: scale(0.98); }
+
+.report-submit, .report-next {
+  border-radius: var(--r-pill);
+  padding: 14px 26px;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.report-free-text {
+  display: block;
+  /* The panel has no side padding of its own; every row sets its own 16px,
+     so this one matches rather than running to the edges. */
+  width: calc(100% - 32px);
+  margin: 10px 16px 0;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--note-edit-text);
+  background: var(--note-edit-bg);
+  border: 1px solid var(--action-btn-border);
+  border-radius: var(--r-card);
+  resize: none;
+}
+.report-free-text:focus { outline: none; border-color: var(--accent, #2d7d4f); }
+
+.report-photo-row { padding: 12px 16px 0; }
+.report-photo-btn {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--r-panel);
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.report-photo-btn.taken {
+  border-style: solid;
+  border-color: #22c55e;
+  color: #15803d;
+  background: #dcfce7;
+}
+
+.report-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px 8px;
+  gap: 10px;
+}
+.report-back {
+  background: none; border: none; color: var(--text-muted);
+  font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; padding: 10px 0;
+}
+.report-next, .report-submit {
+  flex: 1;
+  padding: 13px;
+  border: none;
+  border-radius: var(--r-panel);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s;
+}
+.report-next:disabled, .report-submit:disabled { opacity: 0.35; cursor: default; }
+
+.route-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+/* The home heading is an id, not a class — an earlier pass styled a
+   selector that matches nothing. */
+#site-heading, .route-title { font-family: var(--font-display); }
+
+.route-title { font-size: var(--route-title-font-size); font-weight: var(--route-title-font-weight); line-height: 1.2; }
+.route-day   { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+.route-date  { font-size: 12px; opacity: 0.75; text-align: right; padding-top: 2px; }
+
+.progress-wrap {
+  background: rgba(255,255,255,0.3);
+  border-radius: var(--r-pill);
+  height: 6px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+.progress-bar {
+  background: var(--progress-bar-fill);
+  height: 100%;
+  border-radius: var(--r-pill);
+  transition: width 0.3s ease;
+  width: 0%;
+}
+.progress-text { font-size: 12px; opacity: 0.9; }
+
+/* ── Incident buttons on a stop card ── */
+/* Icon-only and compact: four labelled buttons on every one of 210 cards would
+   bury the stop itself. Sized for a gloved thumb regardless — 40px is above the
+   44px-ish target once the gap is counted. */
+/* Incident buttons.
+
+   These were 40×34 squares with nothing but an emoji on them — below the
+   size a gloved thumb can reliably hit, and giving no clue what they did
+   without holding a finger on one to wait for a tooltip.
+
+   The grid fits as many across as the card allows and wraps the rest: three
+   on a phone, four on an iPad, without either being hard-coded. Each button
+   is as tall as a standard touch target and says what it does. */
+/* How many fit across is not written down anywhere — auto-fit packs in as
+   many as will fit at --report-btn-min-width and wraps the rest. A phone in
+   portrait gets two, a phone on its side or an iPad either way gets four, and
+   changing the minimum width in the editor changes all of those at once
+   without a single breakpoint being touched. */
+.stop-report-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--report-btn-min-width), 1fr));
+  gap: var(--report-btn-gap);
+  margin-top: 14px;
+  /* Separate setting from the gap BETWEEN buttons: that one changes how many
+     fit across, this one only pushes the note further down. */
+  margin-bottom: var(--report-row-space);
+}
+/* The button is the circle AND its word: the circle carries the icon, the word
+   sits under it. It used to be one circle with the word inside, where a long
+   one had nowhere to go — "Contamination" broke into "Contamina" + "tion",
+   and hyphens: auto only helps where the browser has a hyphenation dictionary.
+   Under the circle, no label can break however long the office makes it. */
+.stop-report-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: var(--report-btn-font-weight);
+  font-style: var(--report-btn-font-style);
+  /* The word takes the colour of whatever it is sitting on. It was var(--text)
+     — which is this page's light-on-dark shell colour, near-white, and the
+     stop card is white. The captions were there and unreadable. The card sets
+     its own text colour (and the office can change it), the map's card sets a
+     different one, and inherit is right in both. */
+  color: inherit;
+}
+
+/* The circle itself. aspect-ratio ties its height to the width the column
+   works out to, so it stays perfectly round at every screen size without a
+   size being written down anywhere. */
+.srb-face {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: clamp(20px, 42cqi, 40px);
+  line-height: 1;
+  background: var(--report-btn-bg);
+  color: var(--report-btn-text);
+  transition: transform 0.1s;
+}
+.stop-report-btn { container-type: inline-size; }
+
+/* Colour before wording: the four are distinguishable at a glance, and each
+   fill falls back to the shared one if it is ever unset. */
+.stop-report-btn[data-report="contamination"] .srb-face { background: var(--report-bg-contamination, var(--report-btn-bg)); }
+.stop-report-btn[data-report="overflow"]      .srb-face { background: var(--report-bg-overflow, var(--report-btn-bg)); }
+.stop-report-btn[data-report="skip"]          .srb-face { background: var(--report-bg-skip, var(--report-btn-bg)); }
+.stop-report-btn[data-report="photo"]         .srb-face { background: var(--report-bg-photo, var(--report-btn-bg)); }
+.stop-report-btn:active .srb-face { transform: scale(0.94); }
+
+/* Inside a circle a long word has nowhere to go. 'anywhere' split
+   'Contamination' into 'Contaminatio' + 'n', which reads as a bug. Hyphenate
+   at a real syllable instead, and only break mid-word as a last resort. */
+/* The second array of buttons — the one that appears only when one of the
+   four is tapped. Smaller than the four it replaces, because there can be six
+   of them and the card should not double in height to show them. Same circle,
+   and each inherits the colour of the report it belongs to. */
+.stop-report-row.is-sub {
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--report-btn-min-width) * 0.7), 1fr));
+  gap: calc(var(--report-btn-gap) * 0.7);
+}
+
+/* The same trick the sub-row already uses, for the same reason.
+   Seven report buttons at the full 104px minimum pack two to a row on a
+   phone, which makes the block four rows and 568px deep — the note box and
+   the next stop both get pushed off the screen. Scaled down, three fit
+   across and the block is one screen shorter. The token still governs the
+   size, so raising it still makes every circle bigger; this only changes
+   how many share a row on a phone. */
+@media (max-width: 480px) {
+  .stop-report-row:not(.is-sub) {
+    grid-template-columns: repeat(auto-fit, minmax(calc(var(--report-btn-min-width) * 0.72), 1fr));
+  }
+  /* The words used to be scaled down here too, because a smaller circle could
+     not hold them. They live under the circle now and size themselves from
+     the button's own width, so this breakpoint no longer has an opinion
+     about type. */
+}
+/* A report has been filed that is worth a picture. The camera button is
+   ringed and breathes gently — noticeable at a glance, ignorable if the driver
+   has decided otherwise. It is a reminder, not a demand: nothing is blocked
+   and nothing opens by itself.
+   The ring goes on the circle, not on the button: the button is now a column
+   with a word under it, and a ring around THAT is a rounded rectangle nobody
+   asked for. */
+.srb-nudge .srb-face {
+  box-shadow: 0 0 0 3px var(--report-btn-text, #fff),
+              0 0 0 6px var(--report-bg-photo, #004E2E);
+  animation: srb-breathe 1.8s ease-in-out infinite;
+}
+
+@keyframes srb-breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
+}
+
+/* Someone who has asked for less movement still gets the ring. */
+@media (prefers-reduced-motion: reduce) {
+  .srb-nudge .srb-face { animation: none; }
+}
+
+.srb-sub .srb-label {
+  font-size: clamp(10px, 11cqi, calc(var(--report-btn-font-size) * 0.92));
+}
+
+/* Back out without filing anything further. Quieter than the choices it sits
+   beside, so it never looks like one of them. */
+.srb-back .srb-face {
+  background: var(--action-btn-bg) !important;
+  color: var(--action-btn-text);
+  font-weight: 700;
+}
+
+.srb-label {
+  display: block;
+  max-width: 100%;
+  text-align: center;
+  /* The setting is the CEILING, not the size. Moving the word out of the
+     circle was not enough on its own: the column is still only as wide as the
+     circle, so at 15px "Contamination" still needed 110px of a 106px column
+     and broke into "Contaminati" + "on". 11cqi is 11% of the button's own
+     width, so the longest word the office can reasonably type fits whatever
+     size the circles come out at, and min() means a short word on a big
+     screen never grows past what they asked for. */
+  font-size: clamp(10px, 11cqi, var(--report-btn-font-size));
+  /* …and where even that is not enough room, the word may use the gutter
+     between the circles rather than shrink below legible. 10px is the floor:
+     a caption smaller than that is decoration, not a label. */
+  width: max-content;
+  max-width: calc(100% + var(--report-btn-gap, 10px));
+  line-height: 1.2;
+  /* It may wrap onto a second line here — under the circle there is room, and
+     a line break between words reads as a line break rather than as a bug. */
+  overflow-wrap: break-word;
+}
+
+/* Very narrow phones: two across still beats four squashed, whatever the
+   minimum width is set to.
+   Tried three here when the button count went from four to seven. It buys a
+   shorter card — 204px against 428px — and costs 55px circles with the words
+   breaking inside them. On the narrowest phone a driver reads at arm's
+   length, that is the wrong trade: two stays. */
+@media (max-width: 360px) {
+  .stop-report-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Turn-by-turn banner ── */
+/* Ported from the design already proven in demo.html. Dark plate on purpose:
+   at a glance, at speed, in daylight, this has to read before anything else
+   on the screen. */
+/* The directions banner and its conditions chips live in css/map-ui.css with
+   the rest of the map's interface — the demo draws them too. */
+
+#sim-panel {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 9999;
+  background: #1e1b4b;
+  color: #e0e7ff;
+  font-size: 12px;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.3);
+}
+#sim-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+}
+#sim-bar strong {
+  background: #f59e0b;
+  color: #1e1b4b;
+  padding: 2px 8px;
+  border-radius: var(--r-chip);
+  letter-spacing: 0.08em;
+  font-size: 11px;
+}
+#sim-status { flex: 1; min-width: 140px; opacity: 0.9; }
+#sim-bar button {
+  background: #312e81;
+  color: #e0e7ff;
+  border: 1px solid #4338ca;
+  border-radius: var(--r-control);
+  padding: 5px 10px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+#sim-bar button:hover { background: #3730a3; }
+#sim-bar button.off { background: #7f1d1d; border-color: #b91c1c; color: #fecaca; }
+#sim-bar label { display: flex; align-items: center; gap: 6px; opacity: 0.9; }
+#sim-bar input[type="range"] { width: 90px; }
+/* The speed readout. Tabular figures so the number does not jiggle the bar
+   about as you drag the slider, and a fixed width for the same reason. */
+#sim-speed-read {
+  font-variant-numeric: tabular-nums;
+  min-width: 8.5ch;
+  opacity: 0.85;
+}
+/* Above about 60 mph you are fast-forwarding, not driving, and the view stops
+   looking like a truck. Say so rather than leave it a mystery. */
+#sim-speed-read.fast { color: #fbbf24; opacity: 1; }
+
+#sim-log {
+  max-height: 34vh;
+  overflow-y: auto;
+  border-top: 1px solid #4338ca;
+  padding: 6px 12px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+.sim-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.sim-t { opacity: 0.55; flex-shrink: 0; }
+.sim-outcome { flex-shrink: 0; font-weight: 700; }
+.sim-outcome.ok  { color: #86efac; }
+.sim-outcome.bad { color: #fca5a5; }
+.sim-body { opacity: 0.75; word-break: break-all; }
+
+/* Keep the bottom action bar clear of the panel */
+body.sim-on { padding-bottom: 60px; }
+
+/* ── Pending-writes banner ── */
+/* Calmer than #ws-status on purpose: nothing is wrong, the work is just
+   waiting for signal. Red here would teach drivers to ignore real warnings. */
+#pending-status {
+  display: none;
+  background: var(--hold-bg);
+  color: var(--hold-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  padding: 8px 14px;
+}
+
+/* ── Offline banner ── */
+#ws-status {
+  display: none;
+  background: #fbbf24;
+  color: #78350f;
+  text-align: center;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ── Content ── */
+.content {
+  padding: 12px 12px 100px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ── Section headers ── */
+.section-header {
+  background: var(--route-color-light);
+  color: var(--route-color-dark);
+  font-size: var(--section-header-font-size);
+  font-weight: var(--section-header-font-weight);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 7px 12px;
+  border-radius: var(--r-card);
+  margin: 16px 0 8px;
+}
+
+.completed-section-header {
+  background: var(--completed-section-bg);
+  color: var(--completed-section-text);
+  border: 1px solid var(--completed-section-border);
+}
+
+/* ── Stop card ── */
+.stop-card {
+  background: var(--stop-card-bg);
+  color: var(--stop-card-text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.stop-card.completed {
+  background: var(--stop-done-bg);
+  border-color: var(--stop-done-border);
+}
+
+.stop-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 12px;
+}
+
+.stop-info { flex: 1; min-width: 0; }
+
+.stop-account {
+  font-size: var(--stop-account-font-size);
+  font-weight: var(--stop-account-font-weight);
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.stop-address {
+  font-size: var(--stop-address-font-size);
+  font-weight: var(--stop-address-font-weight);
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+/* When a row carries a highlight colour from the sheet, the card has already
+   chosen black or white text for contrast against THAT colour. These children
+   were overriding it with the theme's own text colours, which is harmless on a
+   light theme — they were nearly the same — and unreadable on a dark one:
+   near-white "Christman, Susan" on a bright yellow row. The sheet's colour
+   wins inside its own card. */
+.stop-card .stop-account,
+.stop-card .stop-address {
+  color: inherit;
+}
+
+/* It opens Google Maps for this stop — what the 📍 Map button used to do. */
+.stop-address-link {
+  display: inline-block;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  text-decoration-style: dotted;
+}
+.stop-card .stop-address {
+  opacity: 0.72;   /* the secondary line stays secondary, whichever way it went */
+}
+/* On a sheet-coloured row the empty note field keeps its own contrast
+   rather than fading into the colour behind it. */
+.stop-card.has-sheet-color .stop-note-empty {
+  background: rgb(255 255 255 / 0.82);
+  color: #1c2a21;
+  border-color: rgb(0 0 0 / 0.18);
+}
+
+/* The stop's note: one field, big enough to read at arm's length in a truck.
+   Tapping it opens an empty box that ADDS to it — the existing words are
+   never loaded into that box, which is what keeps them safe. */
+.stop-note {
+  font-size: var(--stop-note-font-size);
+  font-weight: var(--stop-note-font-weight);
+  margin-top: 0;
+  padding: 12px 14px;
+  border-radius: var(--r-card);
+  line-height: 1.5;
+}
+
+.stop-note-open {
+  display: block;
+  cursor: pointer;
+  border: 1px solid rgb(0 0 0 / 0.10);
+}
+.stop-note-open:active { transform: scale(0.995); }
+
+.stop-note-text { display: block; }
+
+/* Says what tapping does, without being loud about it. */
+.stop-note-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  opacity: 0.6;
+}
+
+/* Nothing written yet: the whole field is the invitation. */
+.stop-note-empty {
+  font-weight: 600;
+  text-align: center;
+  opacity: 0.75;
+  background: var(--action-btn-bg);
+  color: var(--action-btn-text);
+  border-style: dashed;
+}
+
+.note-urgent { background: var(--urgent-bg); color: var(--urgent-text); }
+.note-hold   { background: var(--hold-bg);   color: var(--hold-text);   }
+/* Not the route's own light/dark pair any more. On several routes those two
+   are a few shades apart — Valley Route put #1c3a43 text on #2f6473 — which
+   is a note you cannot read. Its own pair, editable like the others. */
+.note-info   { background: var(--note-bg); color: var(--note-text); }
+
+.stop-directions {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 0 12px 10px 12px;
+  line-height: 1.45;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 0;
+}
+
+/* ── Done button ── */
+.done-btn {
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  border-radius: var(--r-circle);
+  border: none;
+  background: var(--done-btn-bg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--done-btn-text);
+  transition: background 0.4s ease, transform 0.15s, box-shadow 0.4s ease;
+  -webkit-tap-highlight-color: transparent;
+  margin-top: 2px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.done-btn svg { width: 26px; height: 26px; }
+
+.done-btn:active,
+.done-btn.pressed {
+  transform: scale(0.88);
+  background: var(--done-btn-done-bg);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.done-btn.pressed {
+  transform: scale(1);
+  background: var(--done-btn-done-bg);
+}
+
+.undo-btn {
+  font-size: 0.81em;
+  font-weight: 600;
+  border: 1.5px solid var(--done-btn-bg);
+  background: var(--surface);
+  color: var(--done-btn-bg);
+  padding: 8px 14px;
+  border-radius: var(--r-card);
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Stop action buttons (Map / Directions) ── */
+.stop-action-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.stop-action-btn {
+  font-size: var(--action-btn-font-size);
+  font-weight: var(--action-btn-font-weight);
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--action-btn-border);
+  background: var(--action-btn-bg);
+  color: var(--action-btn-text);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.stop-action-btn:active { background: var(--route-color-light); border-color: var(--route-color); color: var(--route-color-dark); }
+
+/* ── View Original overlay ── */
+#original-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  align-items: flex-end;
+}
+
+#original-panel {
+  background: var(--surface);
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#original-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+#original-close {
+  font-size: 13px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-muted);
+  padding: 6px 12px;
+  border-radius: var(--r-card);
+  cursor: pointer;
+}
+
+#original-list {
+  overflow-y: auto;
+  padding: 12px 12px 40px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Note edit ── */
+textarea.note-edit {
+  width: 100%;
+  font-family: var(--font);
+  font-size: var(--note-edit-font-size);
+  font-weight: var(--note-edit-font-weight);
+  padding: 8px 10px;
+  border: 2px solid var(--route-color);
+  border-radius: var(--r-card);
+  background: var(--note-edit-bg);
+  color: var(--note-edit-text);
+  resize: none;
+  margin-top: 8px;
+  min-height: var(--note-edit-height);
+  outline: none;
+  display: block;
+}
+
+/* ── Completed summary ── */
+#completed-summary {
+  display: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  margin-top: 16px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.completed-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.completed-toggle { font-size: 12px; color: var(--route-color); }
+
+#completed-list { border-top: 1px solid var(--border); }
+#completed-list .stop-card { border-radius: 0; border: none; border-bottom: 1px solid var(--border); margin: 0; }
+#completed-list .stop-card:last-child { border-bottom: none; }
+
+/* ── Action bar ── */
+.action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--action-bar-bg);
+  border-top: 1px solid var(--border);
+  padding: 10px 16px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  z-index: 90;
+}
+
+.btn-primary {
+  background: var(--route-color);
+  color: var(--primary-btn-text);
+  border: none;
+  border-radius: var(--r-card);
+  font-size: var(--primary-btn-font-size);
+  font-weight: var(--primary-btn-font-weight);
+  padding: 12px 28px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-primary:disabled { opacity: 0.55; cursor: default; }
+
+.btn-secondary {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 20px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ── Loading ── */
+#loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--route-color);
+  border-radius: var(--r-circle);
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-state { text-align: center; padding: 40px 20px; }
+.error-state button {
+  margin-top: 16px;
+  background: var(--route-color);
+  color: var(--primary-btn-text);
+  border: none;
+  padding: 10px 24px;
+  border-radius: var(--r-card);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* ── Toast ── */
+#toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(16px);
+  background: var(--toast-bg);
+  color: var(--toast-text);
+  padding: 10px 20px;
+  border-radius: var(--r-pill);
+  font-size: var(--toast-font-size);
+  font-weight: var(--toast-font-weight);
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 999;
+}
+
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Home page ── */
+.home-header {
+  background: var(--home-header-bg);
+  color: var(--home-header-text);
+  padding: var(--home-header-padding) 20px;
+  text-align: center;
+  position: relative;
+}
+
+/* Pinned to the header rather than sitting under nine route cards, where it
+   was below the fold on any phone. Quiet enough not to compete with the
+   routes, which are what a driver came for. */
+.dispatch-link {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.dispatch-link:hover { border-color: var(--route-color, var(--text-muted)); }
+
+/* On a narrow screen it sits above the title instead of overlapping it. */
+@media (max-width: 560px) {
+  .home-header { padding-top: 58px; }
+}
+
+.home-logo:empty,
+#site-heading:empty,
+#site-subhead:empty { display: none; }
+
+.home-logo {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.home-header h1 {
+  font-size: var(--home-heading-font-size);
+  font-weight: var(--home-heading-font-weight);
+  letter-spacing: -0.02em;
+}
+
+.home-header p {
+  font-size: var(--home-subhead-font-size);
+  font-weight: var(--home-subhead-font-weight);
+  opacity: 0.55;
+  margin-top: 4px;
+}
+
+.route-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 20px 16px 40px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.route-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  text-decoration: none;
+  border-radius: var(--route-card-radius);
+  padding: 20px 16px 18px;
+  color: white;
+  min-height: 120px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.14);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s;
+  position: relative;
+  overflow: hidden;
+}
+
+.route-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
+}
+
+.route-card:active { transform: scale(0.95); }
+
+.route-card-day {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+.route-card-name {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* ── The map's mode bar on a phone ────────────────────────────────────────
+   This bar has six buttons and it never fitted. Measured on a 390 px phone it
+   was 496 px wide with five buttons and 591 px with six, which is not a
+   cosmetic problem: it made the whole PAGE wider than the screen, so a driver
+   touching anywhere near the map dragged the page sideways under their finger
+   and the map appeared to jump around. That is a two-finger fight between the
+   page scrolling and the map panning, and the map always lost.
+
+   flex: 1 alone could not shrink them, because a flex item will not go below
+   its min-content width by default and `white-space: nowrap` makes that the
+   full label. min-width: 0 lets them shrink; dropping the words below 560 px
+   means they do not have to shrink far.
+
+   Deliberately at the end of the stylesheet: an earlier version of the mobile
+   rules in this file sat above the rules they were meant to override and did
+   nothing at all for months. Same specificity means last one wins. */
+/* .switch-btn had a rule here. Those pills were replaced by the dock's round
+   buttons, and the rule outlived the markup — dead CSS for a class nothing
+   renders, which is exactly what makes a stylesheet hard to reason about
+   later. The dock has its own narrow-phone block further up. */
+
+/* No `overflow-x: hidden` on html or body here, tempting as it is. It would
+   hide this kind of bug rather than fix it, and it silently kills
+   `position: sticky` — which .route-header relies on to keep the route name
+   and the Done count on screen while a driver scrolls the stop list. */
+
+/* ── The header on a phone ────────────────────────────────────────────────
+   Below 640px the route name, the progress text and two view buttons are more
+   than one line can hold honestly, so the links and the date step aside into
+   the hamburger. What stays is what a driver is actually using: which route,
+   how far through it, and the two views.
+
+   At the end of the stylesheet on purpose — same specificity means last one
+   wins, and an earlier mobile block in this file sat above the rules it meant
+   to override and did nothing at all for months. */
+@media (max-width: 640px) {
+  .hdr-menu { display: block; }
+  .route-nav { display: none; }
+  .route-meta { display: none; }        /* day and date live in the drawer */
+  .progress-text { font-size: 11px; }
+  .route-ident .route-title { font-size: 15px; }
+}
+
+/* Narrow phones: the dock's seven circles need the width more than they need
+   the gaps, and the slider can lose a little height. */
+@media (max-width: 400px) {
+  #map-dock { gap: 3px; padding-left: 4px; padding-right: 4px; }
+  .dock-btn, .dock-ico { width: 44px; }
+  .dock-ico { height: 44px; font-size: 19px; }
+  .dock-cap { font-size: 10px; }
+  #zoom-slider { height: 96px; }
+}
+
+/* ── A phone held sideways ────────────────────────────────────────────────
+   About 360px of height, and the app bar, the route line and the action bar
+   were taking a third of it before the map got a pixel. Everything gives a
+   little so the map keeps most of the screen, which is the whole point of
+   turning the phone.
+
+   Keyed on height rather than orientation alone: a short window on a laptop
+   has the same problem and deserves the same answer. */
+@media (max-height: 500px) {
+  .app-bar { padding: 6px 16px; }
+  .app-bar h1 { font-size: 13px; }
+
+  .route-header { padding: 2px 10px 0; }
+  .route-line { min-height: 34px; gap: 8px; }
+  .route-ident .route-title { font-size: 14px; }
+  .view-tab { min-height: 30px; padding: 3px 10px; font-size: 13px; }
+  .progress-text { font-size: 11px; }
+
+  /* The action bar is two buttons wrapped over two lines at this height.
+     One line, smaller type, and it gives 30px back to the map. */
+  .action-bar { padding: 6px 10px; gap: 8px; }
+  .action-bar .btn-primary,
+  .action-bar .btn-secondary { padding: 8px 12px; font-size: 13px; }
+}

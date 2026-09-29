@@ -95,7 +95,10 @@ a{color:inherit}
   transition:transform .16s ease, background .16s ease;
 }
 .btn:hover,.btn:focus-visible{background:var(--accent); transform:translateY(-1px)}
+.btn-quiet{background:none; color:var(--brand); border:1.5px solid var(--rule)}
+.btn-quiet:hover,.btn-quiet:focus-visible{background:var(--brand-soft); color:var(--brand); border-color:var(--brand)}
 .btn-note{font-size:var(--step--1); color:var(--ink-faint); max-width:26ch}
+.btn-note-wide{max-width:var(--measure); margin-block-start:1rem}
 
 /* Facts strip */
 .facts{
@@ -160,10 +163,12 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
       progress as it happens — without anybody learning a new system.
     </p>
     <div class="try">
-      <a class="btn" href="walkthrough.html">Try the walkthrough &rarr;</a>
-      <p class="btn-note">Plays in your browser. Sample data — no real routes,
-         no sign-in.</p>
+      <a class="btn" href="walkthrough.html">The driver's phone &rarr;</a>
+      <a class="btn" href="dispatch.html">The office board &rarr;</a>
+      <a class="btn btn-quiet" href="walkthrough.html?view=map">Route map &rarr;</a>
     </div>
+    <p class="btn-note btn-note-wide">All three run in your browser on invented
+       data — no server, no route sheet, no sign-in, and no customer who exists.</p>
   </header>
 
   <div class="band">
@@ -259,6 +264,30 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
   </section>
 
   <section class="shell">
+    <h2 class="section-head">The office board</h2>
+    <div class="prose">
+      <p>
+        The driver's phone is only half of it. The other half is the screen the
+        office watches: every route's progress at once, an activity feed that
+        fills as the morning happens, and the approval queue where customer
+        requests from the website wait for a human decision.
+      </p>
+      <p>
+        It is driven by a <strong>WebSocket</strong>, so a stop marked done in a
+        truck appears here within a second — no refreshing, no ringing a driver
+        who is driving. A banner appears if a route cannot be written back to
+        the sheet, because silent failure is the one thing an operations screen
+        must never do.
+      </p>
+      <div class="try">
+        <a class="btn btn-quiet" href="dispatch.html">Open the board &rarr;</a>
+        <p class="btn-note">It plays a scripted morning — give it a moment and
+           watch the feed move.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="shell">
     <h2 class="section-head">The part I am most pleased with</h2>
     <div class="prose">
       <p>
@@ -313,9 +342,8 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
         </p>
       </div>
       <div class="try">
-        <a class="btn" href="walkthrough.html">Try the walkthrough &rarr;</a>
-        <p class="btn-note">Two minutes. Switch between map, satellite and
-           Street View.</p>
+        <a class="btn" href="walkthrough.html">The driver's phone &rarr;</a>
+        <a class="btn btn-quiet" href="dispatch.html">The office board &rarr;</a>
       </div>
     </div>
   </section>

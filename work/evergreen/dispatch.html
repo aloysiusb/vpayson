@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="en" data-radius="tight" data-style-button>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dispatch board — live route operations demo</title>
+<meta name="description" content="The office side of a route-hauling application: live driver progress, an activity feed and a customer-request approval queue. Runs on invented sample data.">
+<link rel="canonical" href="https://vpayson.com/work/evergreen/dispatch.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;1,9..40,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/chrome.css">
+
+<style>
+  .demo-banner {
+    background: #b45309; color: #fff; font-size: 13px; line-height: 1.5;
+    padding: 9px 16px; text-align: center;
+  }
+  .demo-banner b { text-transform: uppercase; letter-spacing: .08em; }
+  .demo-banner a { color: #fff; font-weight: 600; }
+  /* The app bar takes its name from a custom property, defaulting to the real
+     client's. This demo runs on an invented company to match its invented
+     customers, and because the client has not yet agreed to be named here. */
+  :root { --appbar-name: "Valley Compost"; }
+</style>
+<script>
+  /* Inline and first, so the board does not flash the system theme before
+     the remembered one is applied. */
+  try {
+    var savedTheme = localStorage.getItem('dispatch_theme');
+    if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+  } catch (err) { /* private mode — fall back to the system preference */ }
+</script>
+<style>
+/* ── Tokens ── */
+/* Each colour reads from a --dispatch-* input the style editor can set,
+   falling back to the value written here when nothing is saved.
+
+   The indirection is the point. The editor pushes its values as INLINE styles
+   on :root, and an inline style beats any selector — so if it set --bg
+   directly it would override both the dark-mode block below and the theme
+   toggle, and this page would be stuck in one theme forever. Setting the
+   inputs instead leaves the theme selectors free to choose between them. */
+:root {
+  --d-bg:       var(--dispatch-bg, #f2f7f3);
+  --d-surface:  var(--dispatch-surface, #ffffff);
+  --d-border:   var(--dispatch-border, #d4e8d8);
+  --d-accent:   var(--dispatch-accent, #16a34a);
+  --d-text:     var(--dispatch-text, #1a2b1d);
+  --d-muted:    var(--dispatch-muted, #5e7e63);
+  --d-muted-bg: var(--dispatch-muted-bg, #e8f2ea);
+  --d-done:     var(--d-accent);
+  --d-warn:     var(--dispatch-warn, #d97706);
+  --d-danger:   var(--dispatch-danger, #dc2626);
+  --d-ws-ok:    #22c55e;
+  --d-ws-bad:   #ef4444;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --d-bg:       var(--dispatch-dark-bg, #0c160e);
+    --d-surface:  var(--dispatch-dark-surface, #141f16);
+    --d-border:   var(--dispatch-dark-border, #1e3022);
+    --d-accent:   var(--dispatch-dark-accent, #4ade80);
+    --d-text:     var(--dispatch-dark-text, #e2ede4);
+    --d-muted:    var(--dispatch-dark-muted, #6b9070);
+    --d-muted-bg: var(--dispatch-dark-muted-bg, #1a2e1d);
+    --d-done:     var(--d-accent);
+    --d-warn:     var(--dispatch-dark-warn, #fbbf24);
+    --d-danger:   var(--dispatch-dark-danger, #f87171);
+  }
+}
+:root[data-theme="dark"] {
+  --d-bg:       var(--dispatch-dark-bg, #0c160e);
+  --d-surface:  var(--dispatch-dark-surface, #141f16);
+  --d-border:   var(--dispatch-dark-border, #1e3022);
+  --d-accent:   var(--dispatch-dark-accent, #4ade80);
+  --d-text:     var(--dispatch-dark-text, #e2ede4);
+  --d-muted:    var(--dispatch-dark-muted, #6b9070);
+  --d-muted-bg: var(--dispatch-dark-muted-bg, #1a2e1d);
+  --d-done:     var(--d-accent);
+  --d-warn:     var(--dispatch-dark-warn, #fbbf24);
+  --d-danger:   var(--dispatch-dark-danger, #f87171);
+}
+
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--font, 'DM Sans', system-ui, sans-serif);
+  background: var(--d-bg);
+  color: var(--d-text);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── Header ── */
+.dispatch-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--d-surface);
+  border-bottom: 1px solid var(--d-border);
+  padding: 14px 20px;
+}
+/* Only the status row lives here now — the leaf and the name moved to the
+   shared bar above. Right-aligned, which is where it already sat. */
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.today-label {
+  font-family: var(--font-display, 'Barlow Semi Condensed', sans-serif);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--d-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ws-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-circle);
+  background: var(--d-ws-bad);
+  transition: background 0.4s;
+  flex-shrink: 0;
+}
+.ws-dot.live { background: var(--d-ws-ok); }
+/* A route the app cannot write to.
+ *
+ * Without this the failure is silent from the office's side: the tab simply
+ * never updates, and the first anyone knows is a driver saying their work did
+ * not save. It is stated here, on the screen that is already open all day. */
+.sheet-alert {
+  margin: 10px 0 0;
+  padding: 11px 14px;
+  border-radius: var(--r-card);
+  background: var(--d-warn);
+  color: #1a1206;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.sheet-alert b { font-weight: 800; }
+.sheet-alert .sa-detail {
+  display: block;
+  margin-top: 3px;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.header-link {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--d-muted);
+  padding: 4px 8px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--d-border);
+  white-space: nowrap;
+}
+.header-link:hover { color: var(--d-text); border-color: var(--d-muted); }
+
+.ws-label {
+  font-size: 11px;
+  color: var(--d-muted);
+  letter-spacing: 0.05em;
+  font-weight: 500;
+}
+
+/* Fleet summary bar */
+.fleet-bar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.fleet-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.fleet-num {
+  font-family: var(--font-display, 'Barlow Semi Condensed', sans-serif);
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.fleet-num.accent { color: var(--d-accent); }
+.fleet-label {
+  font-size: 11px;
+  color: var(--d-muted);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.fleet-progress {
+  flex: 1;
+  min-width: 120px;
+  height: 6px;
+  background: var(--d-border);
+  border-radius: var(--r-chip);
+  overflow: hidden;
+}
+.fleet-progress-fill {
+  height: 100%;
+  background: var(--d-accent);
+  border-radius: var(--r-chip);
+  transition: width 0.5s ease;
+}
+.fleet-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--d-border);
+  flex-shrink: 0;
+}
+
+/* ── Grid ── */
+/* ── The day's feed ───────────────────────────────────────────────────
+   Everything the drivers do, in order, as it happens. The route cards above
+   answer "how far along is each truck"; this answers "what just happened",
+   which is the thing you otherwise have to ask someone. */
+.feed-wrap {
+  max-width: 1400px;
+  margin: 0 auto 26px;
+  padding: 0 20px;
+}
+.feed-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.feed-title {
+  font-family: var(--font-display, 'Barlow Semi Condensed', sans-serif);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.feed-count { font-size: 12.5px; color: var(--d-muted); }
+.feed-day {
+  margin-left: auto;
+  font: inherit;
+  font-size: 12px;
+  min-height: 40px;
+  padding: 3px 8px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--d-border);
+  background: var(--d-surface);
+  color: var(--d-text);
+}
+/* Looking at a past day: say so, so nobody reads yesterday as now. */
+.feed-wrap.past .feed-title::after {
+  content: " — past day";
+  color: var(--d-warn);
+  font-size: 0.7em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.feed {
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: var(--r-card);
+  max-height: 310px;
+  overflow-y: auto;
+}
+.feed-empty { padding: 20px; color: var(--d-muted); font-size: 13.5px; line-height: 1.55; }
+
+.feed-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 3px 12px;
+  align-items: baseline;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--d-border);
+}
+.feed-item:last-child { border-bottom: 0; }
+
+/* A stripe carries the kind, so a wall of text is scannable at a glance. */
+.feed-item.done   { border-left: 3px solid var(--d-done); }
+.feed-item.note   { border-left: 3px solid var(--d-accent); }
+.feed-item.issue  { border-left: 3px solid var(--d-warn); }
+.feed-item.undone { border-left: 3px solid var(--d-muted); }
+.feed-item.photo  { border-left: 3px solid var(--blue, #1e4e79); }
+.feed-photo {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--d-accent);
+}
+
+.feed-icon { font-size: 14px; line-height: 1.4; }
+.feed-body { min-width: 0; }
+.feed-who {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+/* Where the stop is. Quieter than the name above it, louder than nothing —
+   this is what someone reads before deciding to drive out. */
+.feed-where {
+  font-size: 12px;
+  color: var(--d-muted);
+  margin-top: 1px;
+}
+.feed-what {
+  font-size: 13px;
+  color: var(--d-text);
+  word-break: break-word;
+  margin-top: 3px;
+}
+.feed-photo { display: block; }
+.feed-thumb {
+  display: block;
+  min-height: 60px;          /* never collapse to a sliver while loading */
+  max-width: 260px;
+  width: 100%;
+  height: auto;
+  margin: 8px 0 4px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--d-border);
+  background: var(--d-muted-bg);
+}
+
+.feed-sim {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--d-warn);
+  color: #1a1206;
+  vertical-align: middle;
+}
+.feed-item.is-sim { opacity: 0.88; }
+
+.feed-time {
+  font-size: 11.5px;
+  color: var(--d-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.feed-route {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  /* Was a bare 3px. Every corner in this app resolves through tokens.css so
+     the whole thing stays consistent; --r-chip is the role for a small tag. */
+  border-radius: var(--r-chip);
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+
+.grid-wrap {
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+/* ── Route card ── */
+.route-card {
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: var(--r-sheet);
+  overflow: hidden;
+  transition: opacity 0.2s;
+}
+/* Off-day cards are de-emphasised, but NOT by fading the whole card: at 45%
+   the route colour washed out to something that looked broken rather than
+   inactive — and on a Friday that is six cards out of nine. The header keeps
+   its colour at full strength so the route is still identifiable; only the
+   detail below it recedes. */
+.route-card.off-day > *:not(.route-card-top) {
+  opacity: 0.55;
+}
+.route-card.off-day .route-card-top {
+  filter: saturate(0.8);
+}
+.route-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--d-border);
+  /* The route's colour, at full strength, across the whole header — so a
+     route is identifiable from the far side of the room. Text on it is set
+     dark here and inherited by everything inside, rather than each element
+     picking its own colour and some of them missing. */
+  background: var(--route-color, var(--d-surface));
+  color: var(--dispatch-card-header-text, #14241b);
+}
+
+/* Inside the coloured header, chips go translucent-dark rather than keeping
+   their own greens and greys — one rule that reads correctly on any route
+   colour, instead of a per-colour guess. */
+.route-card-top .route-day-chip.today,
+.route-card-top .route-day-chip.off {
+  background: rgb(0 0 0 / 0.13);
+  color: inherit;
+}
+/* Kept in the markup, hidden here: it was a 4px hint of the route colour
+   back when the header was plain. The header is the colour now. */
+.route-stripe { display: none; }
+.route-info { flex: 1; min-width: 0; }
+.route-name {
+  font-family: var(--font-display, 'Barlow Semi Condensed', sans-serif);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.route-day-chip {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: var(--r-control);
+  margin-top: 3px;
+}
+.route-day-chip.today {
+  background: var(--d-accent);
+  color: #fff;
+}
+.route-day-chip.off {
+  background: var(--d-muted-bg);
+  color: var(--d-muted);
+}
+/* Opens the route's own map in a new tab. On the card rather than buried,
+   because "where does this route actually go" is a question asked while
+   looking at the card. */
+.route-map-link {
+  font-size: 17px;
+  text-decoration: none;
+  line-height: 1;
+  /* The office may well be on an iPad; a 25px icon is a miss waiting to happen. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 4px 6px;
+  border-radius: var(--r-control);
+  opacity: 0.55;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease;
+}
+.route-map-link:hover { opacity: 1; background: var(--d-muted-bg); }
+
+.route-status-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Progress */
+.route-progress {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--d-border);
+}
+.progress-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 7px;
+}
+.progress-fraction {
+  font-family: var(--font-display, 'Barlow Semi Condensed', sans-serif);
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--route-color, var(--d-text));
+}
+.progress-pct {
+  font-size: 12px;
+  color: var(--d-muted);
+  font-weight: 500;
+}
+.progress-bar {
+  height: 8px;
+  background: var(--d-border);
+  border-radius: var(--r-control);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: var(--r-control);
+  transition: width 0.5s ease;
+  background: var(--route-color, var(--d-accent));
+}
+
+/* Current stop */
+.current-stop {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--d-border);
+  min-height: 64px;
+}
+.current-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--d-muted);
+  margin-bottom: 4px;
+}
+.current-name {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.current-addr {
+  font-size: 12px;
+  color: var(--d-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.current-empty {
+  font-size: 13px;
+  color: var(--d-muted);
+  font-style: italic;
+}
+
+/* Incidents */
+.incidents {
+  padding: 10px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 42px;
+}
+.incident-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: var(--r-card);
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.incident-chip.contamination { background: #fee2e2; color: #dc2626; }
+.incident-chip.overflow      { background: #fef3c7; color: #d97706; }
+.incident-chip.skip          { background: var(--d-muted-bg); color: var(--d-muted); }
+.incident-chip.photo         { background: #dbeafe; color: #1d4ed8; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .incident-chip.contamination { background: #450a0a; color: #fca5a5; }
+  :root:not([data-theme="light"]) .incident-chip.overflow      { background: #451a03; color: #fcd34d; }
+  :root:not([data-theme="light"]) .incident-chip.photo         { background: #0c1e40; color: #93c5fd; }
+}
+:root[data-theme="dark"] .incident-chip.contamination { background: #450a0a; color: #fca5a5; }
+:root[data-theme="dark"] .incident-chip.overflow      { background: #451a03; color: #fcd34d; }
+:root[data-theme="dark"] .incident-chip.photo         { background: #0c1e40; color: #93c5fd; }
+
+.no-incidents {
+  font-size: 11px;
+  color: var(--d-muted);
+  font-style: italic;
+  align-self: center;
+}
+
+/* Loading/error states */
+.loading-grid {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--d-muted);
+  font-size: 14px;
+}
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--d-border);
+  border-top-color: var(--d-accent);
+  border-radius: var(--r-circle);
+  animation: spin 0.7s linear infinite;
+  margin: 0 auto 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+  .progress-fill, .fleet-progress-fill { transition: none; }
+}
+
+/* Theme toggle */
+.theme-toggle {
+  background: var(--d-muted-bg);
+  border: none;
+  border-radius: var(--r-card);
+  min-height: 40px;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: var(--d-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+}
+.theme-toggle:hover { color: var(--d-text); }
+
+/* The way to the approval board, and the count of what is waiting on it.
+   A request arriving in the feed scrolls away; this does not, so the board
+   can say "three people are waiting" an hour after they came in. */
+.approvals-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;           /* 40px was my own miss — 44 is the minimum */
+  padding: 5px 12px;
+  border-radius: var(--r-card);
+  background: var(--d-muted-bg);
+  color: var(--d-muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.approvals-link:hover { color: var(--d-text); }
+.approvals-link.waiting { background: var(--d-accent); color: #08170d; }
+.approvals-link.waiting:hover { color: #08170d; }
+.approvals-count {
+  display: none;
+  min-width: 19px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .22);
+  font-size: 11.5px;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.approvals-link.waiting .approvals-count { display: inline-block; }
+</style>
+</head>
+<body>
+
+<div class="demo-banner">
+  <b>Demonstration</b> — the real office board, running on invented data. No
+  server, no route sheet, no customer is real. It plays a scripted morning, so
+  give it a moment and watch the feed and the route cards move.
+  <a href="./">How it was built</a>
+</div>
+
+<header class="app-bar">
+  <h1><span class="app-mark"></span><span class="app-name"></span> <span class="app-page">Dispatch</span></h1>
+  <nav><a href="walkthrough.html">Driver view</a><a href="dispatch.html" aria-current="page">Dispatch</a><a href="./">About this project</a></nav>
+</header>
+
+<header class="dispatch-header">
+  <div class="header-top">
+    <!-- The leaf and the name live in the bar above; this row is what is
+         specific to the board. -->
+    <div class="header-meta">
+      <div class="today-label" id="today-label"></div>
+      <div class="fleet-divider"></div>
+      <div class="ws-dot" id="ws-dot"></div>
+      <div class="ws-label" id="ws-label">Connecting…</div>
+      <div class="fleet-divider"></div>
+      <a class="approvals-link" id="approvals-link" href="#" onclick="return false" title="The approval queue is part of the live app"
+         title="Customer requests waiting for approval">
+        <span>Approvals</span><span class="approvals-count" id="approvals-count">0</span>
+      </a>
+      <div class="fleet-divider"></div>
+      <button class="theme-toggle" onclick="toggleTheme()">☀ / ☾</button>
+    </div>
+  </div>
+  <div class="sheet-alert" id="sheet-alert" hidden></div>
+  <div class="fleet-bar" id="fleet-bar">
+    <div class="fleet-stat">
+      <div class="fleet-num accent" id="fleet-done">—</div>
+      <div class="fleet-label">stops done</div>
+    </div>
+    <div class="fleet-stat">
+      <div class="fleet-num" id="fleet-total">—</div>
+      <div class="fleet-label">total stops</div>
+    </div>
+    <div class="fleet-progress">
+      <div class="fleet-progress-fill" id="fleet-fill" style="width:0%"></div>
+    </div>
+    <div class="fleet-stat">
+      <div class="fleet-num" id="fleet-incidents" style="color:var(--d-warn)">0</div>
+      <div class="fleet-label">incidents today</div>
+    </div>
+  </div>
+</header>
+
+<div class="feed-wrap">
+  <div class="feed-head">
+    <h2 class="feed-title">As it happens</h2>
+    <span class="feed-count" id="feed-count">nothing yet today</span>
+    <select class="feed-day" id="feed-day" aria-label="Which day to show"></select>
+  </div>
+  <div class="feed" id="feed">
+    <div class="feed-empty">
+      Stops marked done, notes written and incidents filed will appear here the
+      moment a driver taps them. Nothing to refresh.
+    </div>
+  </div>
+</div>
+
+<div class="grid-wrap" id="grid">
+  <div class="loading-grid"><div class="spinner"></div>Loading routes…</div>
+</div>
+
+<!-- Demo harness: swaps window.fetch and window.WebSocket for fixtures.
+     Must load first. See js/demo-data.js for what it fakes and why. -->
+<script src="js/demo-data.js"></script>
+<script src="js/routes.js"></script>
+<script>
+/* ROUTES comes from /js/routes.js, loaded above.
+ *
+ * This file used to carry its own copy, and the two had drifted: the route
+ * picker showed Valley Route in muted teal while this board showed it in
+ * bright sky blue. Same route, two colours, depending which screen you were
+ * looking at — which defeats the point of colour-coding them.
+ *
+ * Route colours are editable, so the saved one wins when there is one. That
+ * is the same key the home page reads, so whatever is set there shows up
+ * here without anything further to configure. */
+function routeColor(route) {
+  return (savedStyles && savedStyles['route-' + route.id]) || route.color;
+}
+let savedStyles = null;
+
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const today = DAYS[new Date().getDay()];
+document.getElementById('today-label').textContent = today;
+
+// ── State ─────────────────────────────────────────────────────────────────
+const routeState = {};  // tabName → { items, error }
+
+// ── Incident detection ────────────────────────────────────────────────────
+/* Incidents on a route, read from the notes the drivers wrote.
+ *
+ * This looked at the FIRST character of a note. A note is a line of history —
+ * "Gate code 1234 · 🚫 Contamination: 2 bags" — so on any stop the office had
+ * already written on, the marker is never at the front, and the card said "No
+ * incidents" while the sheet plainly had some.
+ *
+ * Splitting on the same separator the app writes with finds the marker
+ * wherever it sits, and shows just that part rather than forty characters of
+ * whatever came before it. */
+function parseIncidents(items) {
+  const TYPES = [
+    ['🚫', 'contamination'],
+    ['📦', 'overflow'],
+    ['⏭', 'skip'],
+    ['📷', 'photo'],
+  ];
+  const chips = [];
+  for (const s of items) {
+    if (!s.notes) continue;
+    for (const part of String(s.notes).split(' · ')) {
+      const t = part.trim();
+      const hit = TYPES.find(([icon]) => t.startsWith(icon));
+      if (!hit) continue;
+      /* The colour already says WHAT kind of incident it is — red for
+         contamination, amber for overflow — so the few words that fit are
+         better spent on WHO it happened at. Reading "Contamination" on a card
+         and still having to hunt the feed for which stop was the gap. */
+      chips.push({
+        type: hit[1],
+        label: s.accountName || s.address || ('Stop ' + s.rowNumber),
+        detail: (s.accountName || s.address || '') + ' — ' + t,
+      });
+    }
+  }
+  return chips;
+}
+
+// ── Render one card ───────────────────────────────────────────────────────
+function renderCard(route) {
+  const state = routeState[route.tabName];
+  /* "Daily" means it can run on any working day — not that it runs on a
+     Sunday. Without this, a weekend showed Max Routes with a truck beside it
+     while every other route sat paused, which reads as "there is a truck out"
+     on a day nobody is working. */
+  const isWorkingDay = today !== 'Saturday' && today !== 'Sunday';
+  const isToday = route.day === today || (route.day === 'Daily' && isWorkingDay);
+  const card = document.getElementById('card-' + route.id) || makeCardEl(route.id);
+  // One variable per card; the stylesheet does the rest. Cheaper than
+  // threading the colour through every template string, and it means a
+  // colour change is one property write rather than a re-render.
+  card.style.setProperty('--route-color', routeColor(route));
+
+  if (!state) {
+    card.innerHTML = cardSkeleton(route, isToday);
+    return card;
+  }
+  if (state.error) {
+    card.innerHTML = cardError(route, isToday);
+    return card;
+  }
+
+  const stops = state.items.filter(s => !s.isSectionHeader);
+  const done  = stops.filter(s => s.done).length;
+  const total = stops.length;
+  const pct   = total > 0 ? Math.round(done / total * 100) : 0;
+  const current = stops.find(s => !s.done);
+  const incidents = parseIncidents(stops);
+
+  const statusIcon = pct === 100 ? '✅' : isToday ? '🚛' : '⏸';
+
+  const incidentHtml = incidents.length
+    ? incidents.slice(0, 4).map(c =>
+        `<span class="incident-chip ${c.type}" title="${esc(c.detail || c.label)}">${esc(c.label)}</span>`
+      ).join('')
+    : `<span class="no-incidents">No incidents</span>`;
+
+  const currentHtml = !current
+    ? `<div class="current-empty">All stops complete</div>`
+    : `<div class="current-name">${esc(current.accountName || current.address)}</div>
+       ${(current.accountName && current.address)
+          ? `<div class="current-addr">${esc(current.address)}${current.city ? ', ' + current.city : ''}</div>`
+          : current.city ? `<div class="current-addr">${esc(current.city)}</div>` : ''}`;
+
+  card.className = 'route-card' + (isToday ? '' : ' off-day');
+  card.innerHTML = `
+    <div class="route-card-top">
+      <div class="route-stripe"></div>
+      <div class="route-info">
+        <div class="route-name">${esc(route.name)}</div>
+        <div class="route-day-chip ${isToday ? 'today' : 'off'}">${esc(route.day)}</div>
+      </div>
+      <a class="route-map-link" href="walkthrough.html?view=map" target="_blank"
+         rel="noopener" title="See this route on a map">🗺</a>
+      <div class="route-status-icon">${statusIcon}</div>
+    </div>
+    <div class="route-progress">
+      <div class="progress-row">
+        <span class="progress-fraction">${done}<span style="font-size:13px;font-weight:500;color:var(--d-muted)"> / ${total}</span></span>
+        <span class="progress-pct">${pct}%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width:${pct}%;"></div>
+      </div>
+    </div>
+    <div class="current-stop">
+      <div class="current-label">Current stop</div>
+      ${currentHtml}
+    </div>
+    <div class="incidents">${incidentHtml}</div>`;
+
+  return card;
+}
+
+function cardSkeleton(route, isToday) {
+  return `<div class="route-card-top">
+      <div class="route-stripe"></div>
+      <div class="route-info">
+        <div class="route-name">${esc(route.name)}</div>
+        <div class="route-day-chip ${isToday ? 'today' : 'off'}">${esc(route.day)}</div>
+      </div>
+    </div>
+    <div style="padding:20px 16px;color:var(--d-muted);font-size:13px;">Loading…</div>`;
+}
+
+function cardError(route, isToday) {
+  return `<div class="route-card-top">
+      <div class="route-stripe"></div>
+      <div class="route-info">
+        <div class="route-name">${esc(route.name)}</div>
+        <div class="route-day-chip ${isToday ? 'today' : 'off'}">${esc(route.day)}</div>
+      </div>
+    </div>
+    <div style="padding:16px;font-size:12px;color:var(--d-danger);">Could not load route</div>`;
+}
+
+function makeCardEl(id) {
+  const el = document.createElement('div');
+  el.id = 'card-' + id;
+  el.className = 'route-card';
+  return el;
+}
+
+// ── Fleet summary ─────────────────────────────────────────────────────────
+function updateFleet() {
+  let totalDone = 0, totalAll = 0, totalIncidents = 0;
+  for (const route of ROUTES) {
+    const state = routeState[route.tabName];
+    if (!state || state.error) continue;
+    const stops = state.items.filter(s => !s.isSectionHeader);
+    totalAll  += stops.length;
+    totalDone += stops.filter(s => s.done).length;
+    totalIncidents += parseIncidents(stops).length;
+  }
+  const pct = totalAll > 0 ? Math.round(totalDone / totalAll * 100) : 0;
+  document.getElementById('fleet-done').textContent = totalDone;
+  document.getElementById('fleet-total').textContent = totalAll;
+  document.getElementById('fleet-fill').style.width = pct + '%';
+  document.getElementById('fleet-incidents').textContent = totalIncidents;
+}
+
+// ── Full re-render ────────────────────────────────────────────────────────
+function renderAll() {
+  const grid = document.getElementById('grid');
+  // Build or update cards
+  ROUTES.forEach(route => {
+    let card = document.getElementById('card-' + route.id);
+    const isNew = !card;
+    if (isNew) {
+      card = makeCardEl(route.id);
+      grid.appendChild(card);
+    }
+    renderCard(route);
+  });
+  updateFleet();
+}
+
+// ── Fetch all routes ──────────────────────────────────────────────────────
+async function loadAll() {
+  document.getElementById('grid').innerHTML = '<div class="loading-grid"><div class="spinner"></div>Loading all routes…</div>';
+  await Promise.all(ROUTES.map(async route => {
+    try {
+      const res = await fetch('/api/routes/' + encodeURIComponent(route.tabName));
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      routeState[route.tabName] = { items: data.items };
+    } catch {
+      routeState[route.tabName] = { error: true };
+    }
+  }));
+  document.getElementById('grid').innerHTML = '';
+  renderAll();
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────────────
+let ws, wsTimer;
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(proto + '//' + location.host + '/ws');
+  ws.onopen = () => {
+    document.getElementById('ws-dot').classList.add('live');
+    document.getElementById('ws-label').textContent = 'Live';
+    if (wsTimer) { clearTimeout(wsTimer); wsTimer = null; }
+  };
+  ws.onclose = () => {
+    document.getElementById('ws-dot').classList.remove('live');
+    document.getElementById('ws-label').textContent = 'Reconnecting…';
+    wsTimer = setTimeout(connectWS, 4000);
+  };
+  ws.onmessage = (event) => {
+    handleMessage(JSON.parse(event.data));
+  };
+}
+
+/* One path for a message, whether it just arrived or is being replayed from
+   today's record. Two paths would drift, and the replayed half is the one
+   nobody would notice breaking. */
+function handleMessage(msg) {
+  {
+
+    // Before the route lookup: a style change carries no tabName, so the
+    // guard below would drop it.
+    if (msg.type === 'style-updated' && window.onStyleMessage) {
+      window.onStyleMessage(msg);
+      return;
+    }
+
+
+    /* A customer request from the website.
+       The board is meant to be the one screen the office watches, and until
+       now a new customer could arrive on it and never appear here at all. */
+    if (msg.type === 'request-created') {
+      const KIND = {
+        new_customer: 'New customer',
+        hold: 'Service hold',
+        missed: 'Missed pickup',
+        update: 'Account update',
+      };
+      addFeed({
+        key: 'request:' + msg.id,
+        kind: 'request',
+        icon: '🆕',
+        who: msg.name || 'A customer',
+        where: msg.address || '',
+        what: (KIND[msg.kind] || 'Request') + ' — waiting in the queue',
+        link: null,
+        routeName: 'From the website',
+        color: 'var(--d-accent)',
+      });
+      refreshApprovals();
+      return;
+    }
+
+    if (msg.type === 'request-decided') {
+      refreshApprovals();
+      addFeed({
+        key: 'request:' + msg.id,
+        kind: msg.status === 'approved' ? 'done' : 'undone',
+        icon: msg.status === 'approved' ? '✅' : '✖️',
+        who: 'Customer request',
+        what: msg.status === 'approved'
+          ? 'Approved and added to a route'
+          : 'Declined',
+        routeName: 'From the website',
+        color: 'var(--d-accent)',
+      });
+      return;
+    }
+
+    /* A driver's free-form note, written from the truck rather than against a
+       stop. It was reaching the Driver Notes Log tab and nowhere a person
+       would see it. */
+    if (msg.type === 'notes-log-entry') {
+      const noteRoute = ROUTES.find(r => r.tabName === msg.tabName);
+      addFeed({
+        kind: 'note',
+        icon: '📝',
+        who: msg.accountName || msg.driverName || 'A driver',
+        where: '',
+        what: msg.text || '',
+        routeName: noteRoute ? noteRoute.name : (msg.tabName || ''),
+        color: noteRoute ? routeColor(noteRoute) : 'var(--d-muted)',
+      });
+      return;
+    }
+
+    /* A photo, announced by the server the moment it lands. The link used to
+       be dug out of the note text; it is in its own column now, so the note
+       just says a photo was taken and this carries the picture. */
+    if (msg.type === 'photo-added') {
+      const photoRoute = ROUTES.find(r => r.tabName === msg.tabName);
+      const stop = stopFor(msg.tabName, msg.rowNumber);
+      addFeed({
+        key: feedKey(msg.tabName, msg.rowNumber, 'photo'),
+        kind: 'photo',
+        icon: '📷',
+        link: msg.link,
+        who: stopLabel(stop) || msg.account || ('Stop ' + msg.rowNumber),
+        where: stopWhere(stop),
+        what: 'Photo taken',
+        routeName: photoRoute ? photoRoute.name : msg.tabName,
+        color: photoRoute ? routeColor(photoRoute) : 'var(--d-muted)',
+      });
+      return;
+    }
+
+    /* A test drive. It shows in the feed so a demo is visible here, but it
+       deliberately does NOT touch routeState — the stop counts and progress
+       bars keep reporting what the sheet actually says, so a demo running
+       next to a real shift cannot make the numbers lie. */
+    if (msg.sim) {
+      const simRoute = ROUTES.find(r => r.tabName === msg.tabName);
+      // Same photo detection the real path uses — a test drive that files a
+      // photo should show the photo, or the demo proves less than it should.
+      const simPhoto = String(msg.notes || '')
+        .match(/https?:\/\/\S*?(?:drive\.google\.com|\/photos\/)\S+/);
+      addFeed({
+        key: feedKey(msg.tabName, msg.rowNumber,
+          simPhoto ? 'photo' : (msg.type === 'note-updated' ? 'note' : 'done')),
+        kind: simPhoto ? 'photo' : (msg.type === 'note-updated' ? 'note' : (msg.done ? 'done' : 'undone')),
+        icon: simPhoto ? '📷' : (msg.type === 'note-updated' ? '📝' : (msg.done ? '✅' : '↩️')),
+        link: simPhoto ? simPhoto[0] : null,
+        who: stopLabel(stopFor(msg.tabName, msg.rowNumber)) || ('Stop ' + msg.rowNumber),
+        where: stopWhere(stopFor(msg.tabName, msg.rowNumber)),
+        what: msg.type === 'note-updated' ? (msg.notes || '') : (msg.done ? 'Marked done' : 'Reopened'),
+        routeName: simRoute ? simRoute.name : msg.tabName,
+        color: simRoute ? routeColor(simRoute) : 'var(--d-muted)',
+        sim: true,
+      });
+      return;
+    }
+
+    /* A road hazard one of the drivers filed. Not about a stop either, and not
+       about one route — a rockslide is everybody's business — so it is handled
+       before the per-route lookup below. */
+    if (msg.type === 'hazard-added' && msg.hazard) {
+      const h = msg.hazard;
+      const hzRoute = ROUTES.find(r => r.tabName === h.tabName);
+      addFeed({
+        key: 'hz-' + h.id,
+        kind: 'hazard',
+        icon: h.icon || '⚠️',
+        link: `https://www.google.com/maps/search/?api=1&query=${h.lat},${h.lng}`,
+        who: h.label,
+        where: h.note || '',
+        what: `${h.lat.toFixed(5)}, ${h.lng.toFixed(5)}`,
+        routeName: hzRoute ? hzRoute.name : (h.tabName || 'Road'),
+        color: hzRoute ? routeColor(hzRoute) : 'var(--d-muted)',
+      });
+      return;
+    }
+    if (msg.type === 'hazard-cleared') return;   // the feed keeps the history
+
+    /* A driver answering "where are you?". Not about a stop, so it is handled
+       before the lookup below would drop it, and it carries a map link —
+       a pair of coordinates in a feed is no use to someone trying to picture
+       where that actually is. */
+    if (msg.type === 'driver-location') {
+      const locRoute = ROUTES.find(r => r.tabName === msg.tabName);
+      const acc = typeof msg.accuracy === 'number' ? ` ±${Math.round(msg.accuracy)} m` : '';
+      addFeed({
+        // Not keyed to a stop: each send is its own entry, because the whole
+        // point of sending twice is to show that the truck has moved.
+        key: 'loc-' + msg.tabName + '-' + msg.at,
+        kind: 'location',
+        icon: '📍',
+        link: `https://www.google.com/maps/search/?api=1&query=${msg.lat},${msg.lng}`,
+        who: 'Driver position',
+        where: msg.stop ? 'near ' + msg.stop : '',
+        what: `${msg.lat.toFixed(5)}, ${msg.lng.toFixed(5)}${acc}`,
+        routeName: locRoute ? locRoute.name : (msg.tabName || 'Route'),
+        color: locRoute ? routeColor(locRoute) : 'var(--d-muted)',
+      });
+      return;
+    }
+
+    /* Everything past here is about a stop on a route. Messages that are not —
+       requests, free-form notes, styles — have already returned above. */
+    const route = ROUTES.find(r => r.tabName === msg.tabName);
+    if (!route) return;
+    const state = routeState[route.tabName];
+    if (!state || state.error) return;
+
+    if (msg.type === 'stop-updated') {
+      const s = state.items.find(x => x.rowNumber === msg.rowNumber);
+      if (s) s.done = msg.done;
+      addFeed({
+        key: feedKey(msg.tabName, msg.rowNumber, 'done'),
+        kind: msg.done ? 'done' : 'undone',
+        icon: msg.done ? '✅' : '↩️',
+        who: stopLabel(s),
+        where: stopWhere(s),
+        what: msg.done ? 'Marked done' : 'Reopened',
+        routeName: route.name,
+        color: routeColor(route),
+      });
+      renderCard(route);
+      updateFleet();
+    }
+    if (msg.type === 'note-updated') {
+      const s = state.items.find(x => x.rowNumber === msg.rowNumber);
+      if (s) { s.notes = msg.notes; s.noteUrgency = msg.noteUrgency; }
+      // Drive, or this app's own /photos/ path when Drive would not take it.
+      const photo = String(msg.notes || '')
+        .match(/https?:\/\/\S*?(?:drive\.google\.com|\/photos\/)\S+/);
+      const incident = isIncident(msg.notes);
+      addFeed({
+        key: feedKey(msg.tabName, msg.rowNumber, photo ? 'photo' : 'note'),
+        kind: photo ? 'photo' : incident ? 'issue' : 'note',
+        icon: photo ? '📷' : incident ? '⚠️' : '📝',
+        link: photo ? photo[0] : null,
+        who: stopLabel(s),
+        where: stopWhere(s),
+        what: msg.notes,
+        routeName: route.name,
+        color: routeColor(route),
+      });
+      renderCard(route);
+      updateFleet();
+    }
+  };
+}
+
+// ── The day's feed ────────────────────────────────────────────────────────
+//
+// The WebSocket was already carrying every one of these events — they were
+// used to repaint a card and then dropped. Keeping them in order turns the
+// board from "how far along is each truck" into "what has happened today",
+// which is the question you otherwise have to interrupt someone to answer.
+
+const feed = [];
+const FEED_MAX = 120;   // a day's worth; the oldest fall off rather than growing forever
+
+function stopLabel(item) {
+  if (!item) return 'a stop';
+  return item.accountName || item.address || 'a stop';
+}
+
+/* The address, when the line above is already showing the customer's name.
+   Reading "Contamination at Carbondale Community School" tells the office
+   who; it does not tell them where to send anyone. */
+function stopWhere(item) {
+  if (!item) return '';
+  const parts = [];
+  if (item.accountName && item.address) parts.push(item.address);
+  if (item.city) parts.push(item.city);
+  return parts.join(', ');
+}
+
+/* The stop a message refers to, looked up in what this board already has
+   loaded. Works for a real driver and for a test drive alike, so neither ends
+   up with less detail than the other. */
+function stopFor(tabName, rowNumber) {
+  const state = routeState[tabName];
+  if (!state || !state.items) return null;
+  return state.items.find(x => x.rowNumber === Number(rowNumber)) || null;
+}
+
+/* Incidents are notes that start with one of the report marks, so they can be
+   told apart from something a driver typed. */
+function isIncident(text) {
+  return /(^|·\s*)(🚫|📦|⏭|📷)/.test(String(text || ''));
+}
+
+/* How long two updates about the same thing count as the same event. */
+const FEED_MERGE_MS = 15 * 60 * 1000;
+
+/* A note is written three times on the way to being finished — "Contamination",
+   then "Contamination: 3+ bags", then the same with a photo added — and each
+   one arrived as its own line. Five entries for one bin.
+
+   An update about the same stop AND the same kind of thing replaces the
+   earlier one rather than stacking on top of it, so the board shows what IS
+   true rather than every step of getting there. Different kinds stay separate:
+   marking a stop done is not an edit of the contamination report, and should
+   not swallow it. */
+function addFeed(entry) {
+  // Showing a past day: a live event belongs to today, not to what is on
+  // screen. The route cards still update; only this list is held still.
+  if (viewingDay && !entry.at) return;
+
+  // A replayed entry carries the time it actually happened, not the time the
+  // page was opened — otherwise the whole morning would read as "just now".
+  const at = entry.at ? new Date(entry.at) : new Date();
+  if (entry.key) {
+    const i = feed.findIndex(f => f.key === entry.key);
+    if (i >= 0 && Date.now() - feed[i].at.getTime() < FEED_MERGE_MS) {
+      feed.splice(i, 1);
+    }
+  }
+  feed.unshift({ ...entry, at });
+  if (feed.length > FEED_MAX) feed.length = FEED_MAX;
+  renderFeed();
+}
+
+/* Same stop, same kind of event. */
+function feedKey(tabName, rowNumber, group) {
+  return tabName + ':' + rowNumber + ':' + group;
+}
+
+/* A driver's photo, shown rather than linked.
+ *
+ * Drive's webViewLink opens a viewer page, which is no use inside a feed. The
+ * thumbnail endpoint serves the image itself, and it honours the same
+ * permissions as the folder — so it loads for anyone already signed in who can
+ * see the folder, and quietly fails for anyone who cannot. The link stays
+ * underneath, so a thumbnail that does not load is still one click from the
+ * real thing. */
+function photoHtml(link) {
+  const url = String(link);
+  const id = url.match(/\/d\/([A-Za-z0-9_-]{10,})/);
+
+  /* Two kinds of link end up in a note. One from Drive, which needs its
+     thumbnail endpoint because webViewLink is a viewer page; one from this
+     app's own disk, which is already the image and can be shown directly. */
+  const src = id
+    ? 'https://drive.google.com/thumbnail?id=' + id[1] + '&sz=w400'
+    : (/\/photos\/[0-9]{13}-[a-z0-9]{6}\.(jpg|webp)$/.test(url) ? url : null);
+
+  /* No loading="lazy". The feed is a short list inside its own scrolling
+     area, and the browser never decided these were near enough the viewport
+     to fetch — the photo stayed a 2px sliver while the same URL fetched fine
+     by hand. A handful of small images is nothing to defer. */
+  const thumb = src
+    ? '<img class="feed-thumb" alt="Photo of this stop" src="' + esc(src) + '">'
+    : '';
+  return '<a class="feed-photo" href="' + esc(link) + '" target="_blank" rel="noopener">' +
+    thumb + '<span>📷 Open photo</span></a>';
+}
+
+function renderFeed() {
+  const el = document.getElementById('feed');
+  const count = document.getElementById('feed-count');
+  if (!el) return;
+
+  if (!feed.length) return;   // leave the explanatory empty state in place
+
+  count.textContent = feed.length === 1 ? '1 update' : feed.length + ' updates';
+
+  el.innerHTML = feed.map(f => {
+    const time = f.at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const routeChip = f.routeName
+      ? '<span class="feed-route" style="background:' + f.color + '22;color:' + f.color + '">'
+        + esc(f.routeName) + '</span>'
+      : '';
+    /* A test drive is marked, every time. Someone glancing at this screen
+       during a demo must never take a simulated stop for a real one. */
+    const simTag = f.sim ? '<span class="feed-sim">Test drive</span>' : '';
+    return '<div class="feed-item ' + f.kind + (f.sim ? ' is-sim' : '') + '">' +
+      '<span class="feed-icon">' + f.icon + '</span>' +
+      '<div class="feed-body">' +
+        '<div class="feed-who">' + esc(f.who) + routeChip + simTag + '</div>' +
+        (f.where ? '<div class="feed-where">' + esc(f.where) + '</div>' : '') +
+        (f.what ? '<div class="feed-what">' + esc(f.what) + '</div>' : '') +
+        (f.link ? photoHtml(f.link) : '') +
+      '</div>' +
+      '<span class="feed-time">' + time + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+// ── Theme toggle ──────────────────────────────────────────────────────────
+function toggleTheme() {
+  const root = document.documentElement;
+  /* Until someone picks a theme there is no attribute to read, and assuming
+     "light" meant the first tap set dark-on-dark: the button appeared to do
+     nothing. Ask what is actually on screen instead. */
+  let cur = root.getAttribute('data-theme');
+  if (!cur) cur = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  const next = cur === 'dark' ? 'light' : 'dark';
+  root.setAttribute('data-theme', next);
+  // It is a screen someone leaves open all day; re-picking the theme after
+  // every refresh would be a small daily annoyance.
+  try { localStorage.setItem('dispatch_theme', next); } catch (err) { /* private mode */ }
+}
+
+
+// ── Esc util ──────────────────────────────────────────────────────────────
+function esc(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+/* Load the routes first, then replay the day.
+
+   Order matters: the feed resolves each customer name and address out of the
+   route data, so replaying before the routes are loaded would produce a list
+   of anonymous row numbers. */
+loadAll().then(replayToday);
+
+/* Which day the feed is showing. While it is not today, live messages are
+   kept out of it — the route cards go on updating, but yesterday's list must
+   not quietly gain today's events. */
+let viewingDay = null;          // null = today
+
+function buildDayPicker() {
+  const sel = document.getElementById('feed-day');
+  if (!sel) return;
+  const fmt = (d) => d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' });
+  const iso = (d) => d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+
+  const opts = ['<option value="">Today</option>'];
+  for (let i = 1; i <= 6; i++) {            // kept for seven days
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    opts.push('<option value="' + iso(d) + '">' + fmt(d) + '</option>');
+  }
+  sel.innerHTML = opts.join('');
+
+  sel.addEventListener('change', () => {
+    viewingDay = sel.value || null;
+    document.querySelector('.feed-wrap').classList.toggle('past', Boolean(viewingDay));
+    feed.length = 0;
+    const el = document.getElementById('feed');
+    if (el) el.innerHTML = '<div class="feed-empty">Loading…</div>';
+    replayToday();
+  });
+}
+
+buildDayPicker();
+
+async function replayToday() {
+  try {
+    const r = await fetch("/api/activity" + (viewingDay ? "?date=" + viewingDay : ""));
+    const { events } = await r.json();
+    const el = document.getElementById('feed');
+    if (el && !(events || []).length) {
+      el.innerHTML = '<div class="feed-empty">Nothing recorded for this day.</div>';
+    }
+    (events || []).forEach(handleMessage);
+  } catch {
+    // A board without the morning behind it is still a working board.
+  }
+}
+/* Ask the app whether it can actually write to every route.
+ *
+ * /health is outside the access gate and reports names and reasons only — no
+ * customer data — so this works whether or not the board has been unlocked. */
+async function checkSheet() {
+  const el = document.getElementById('sheet-alert');
+  if (!el) return;
+  try {
+    const h = await (await fetch('/health')).json();
+    const problems = (h.sheet && h.sheet.problems) || {};
+    const tabs = Object.keys(problems);
+    if (!tabs.length) { el.hidden = true; return; }
+
+    el.innerHTML =
+      '<b>⚠ ' + tabs.length + ' route' + (tabs.length > 1 ? 's' : '') +
+      ' cannot be saved to.</b> Work done on ' +
+      (tabs.length > 1 ? 'these routes' : 'this route') +
+      ' will wait on the driver\'s phone instead of reaching the sheet.' +
+      tabs.map(t => '<span class="sa-detail">' + esc(t) + ' — ' + esc(problems[t]) + '</span>').join('');
+    el.hidden = false;
+  } catch {
+    // A failed check is not itself worth shouting about.
+  }
+}
+
+/* How many customer requests are sitting unanswered. Re-read rather than
+   counted up and down locally: a request can be approved from the approval
+   board, from another laptop, or while this screen was asleep, and a number
+   the office trusts has to survive all three. */
+async function refreshApprovals() {
+  const link = document.getElementById('approvals-link');
+  const count = document.getElementById('approvals-count');
+  if (!link || !count) return;
+  try {
+    const res = await fetch('/api/requests');
+    if (!res.ok) return;                     // gated or offline — leave it as it was
+    const pending = (await res.json())?.counts?.pending || 0;
+    count.textContent = pending;
+    link.classList.toggle('waiting', pending > 0);
+    link.title = pending
+      ? pending + ' customer request' + (pending === 1 ? '' : 's') + ' waiting for approval'
+      : 'No customer requests waiting';
+  } catch { /* the board keeps working without it */ }
+}
+
+checkSheet();
+setInterval(checkSheet, 10 * 60 * 1000);
+
+connectWS();
+refreshApprovals();
+// Refresh every 5 min in case WebSocket misses something
+setInterval(loadAll, 5 * 60 * 1000);
+setInterval(refreshApprovals, 5 * 60 * 1000);
+</script>
+
+<script src="js/style-units.js"></script>
+<script src="js/fonts.js"></script>
+<script src="js/styles.js"></script>
+<script>
+  /* No socket of its own — connectWS() above already has one, and it hands
+     style messages over via window.onStyleMessage.
+
+     The callback catches route colours, which are stored per route rather
+     than as CSS variables, so the shared client cannot apply them for us. */
+  initStyles(styles => {
+    savedStyles = styles;
+    if (typeof ROUTES !== 'undefined') {
+      ROUTES.forEach(route => {
+        const card = document.getElementById('card-' + route.id);
+        if (card) card.style.setProperty('--route-color', routeColor(route));
+      });
+    }
+  });
+</script>
+</body>
+</html>

@@ -581,7 +581,10 @@ let pending = 0;
 let toastHtml = '';
 let addingNoteRow = null;
 let noteDraft = '';
-let view = 'stops';                       // 'stops' | 'map'
+/* 'stops' | 'map'. ?view=map opens straight on the route map, so the
+   portfolio can link the navigation view directly rather than asking a
+   visitor to find the tab. */
+let view = new URLSearchParams(location.search).get('view') === 'map' ? 'map' : 'stops';
 let turn = null;                          // {arrow, dist, text, next}
 let driverAt = { x: 74, y: 250 };         // position on the stand-in map
 

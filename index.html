@@ -150,6 +150,17 @@ section{padding-block:clamp(2.75rem,7vh,4.5rem)}
 .item p{grid-column:1 / -1; color:var(--ink-soft); font-size:var(--step--1); max-width:52ch; margin-block-start:.3rem}
 .item .go{color:var(--brand); font-weight:600}
 
+/* Confidential work: described, never linked. No hover affordance, because
+   there is nothing to click and pretending otherwise would be annoying. */
+.item-private{cursor:default}
+.item-private:hover{background:none; padding-inline:0}
+.item-private .where{color:var(--ink-faint)}
+.item-private .why{
+  grid-column:1 / -1; margin-block-start:.5rem; font-size:var(--step--1);
+  color:var(--ink-faint); border-inline-start:2px solid var(--rule);
+  padding-inline-start:.8rem; max-width:52ch;
+}
+
 /* ────────────────────────────  APPROACH  ──────────────────────── */
 .cards{display:grid; gap:1.75rem; grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))}
 .card h3{font-size:var(--step-0); margin-block-end:.5rem}
@@ -223,7 +234,7 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
            from the cab, an approval queue for customer requests, and a server
            that physically cannot show a driver the billing columns.</p>
         <span class="stack">Node &middot; Express &middot; WebSockets &middot; Google Sheets API &middot; vanilla JS &middot; in daily use</span>
-        <span class="cta">Try the walkthrough &rarr;</span>
+        <span class="cta">Three live demos — driver's phone, route map, office board &rarr;</span>
       </a>
 
       <a class="app" href="palette/">
@@ -312,6 +323,28 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
              courses and a full reservation engine. Lodging, dining, recreation and
              events served from one site.</p>
         </a>
+
+        <div class="item item-private">
+          <h3>The Lemmon Dociere &amp; related case walls</h3>
+          <span class="where">Confidential &middot; no public link</span>
+          <p>Case-documentation systems for investigative and legal work: a
+             visual wall where documents, people, events and the connections
+             between them are laid out, annotated and re-arranged as a matter
+             develops. One documented architecture, redeployed per case rather
+             than rebuilt — the same engine behind the data wall above.</p>
+          <p>Each wall carries its own admin: a password-gated settings service
+             in plain Node with <em>no dependencies at all</em> — Node's own
+             HTTP, SQLite and crypto modules, nothing from npm. Every change is
+             written to a history table rather than over the previous value, so
+             nothing is ever silently lost and any edit can be walked back.
+             Authentication is a timing-safe comparison; settings are namespaced
+             per wall, so one service backs many.</p>
+          <p class="why">Not linked, and it will not be. These document real
+             people who never agreed to appear in a portfolio and cannot be
+             asked — and redaction would not fix it, because the shape of a case
+             is the sensitive part, not just the names. Happy to talk through
+             the architecture.</p>
+        </div>
 
         <a class="item" href="https://cracksandracks.com/">
           <h3>Cracks &amp; Racks</h3>

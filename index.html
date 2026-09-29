@@ -152,13 +152,14 @@ section{padding-block:clamp(2.75rem,7vh,4.5rem)}
 
 /* Confidential work: described, never linked. No hover affordance, because
    there is nothing to click and pretending otherwise would be annoying. */
-.item-private{cursor:default}
-.item-private:hover{background:none; padding-inline:0}
-.item-private .where{color:var(--ink-faint)}
-.item-private .why{
-  grid-column:1 / -1; margin-block-start:.5rem; font-size:var(--step--1);
-  color:var(--ink-faint); border-inline-start:2px solid var(--rule);
-  padding-inline-start:.8rem; max-width:52ch;
+/* Confidential work sits in the same grid as the rest, but is a div, not a
+   link — there is nothing to click and a hover lift would promise otherwise. */
+.app-private{cursor:default; border-style:dashed}
+.app-private:hover{transform:none; border-color:var(--rule)}
+.app-private .tag{color:var(--ink-faint)}
+.app-private .why{
+  margin-block-start:.4rem; font-size:var(--step--1); color:var(--ink-faint);
+  border-inline-start:2px solid var(--rule); padding-inline-start:.8rem;
 }
 
 /* ────────────────────────────  APPROACH  ──────────────────────── */
@@ -252,17 +253,6 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
         <span class="cta">Build a palette &rarr;</span>
       </a>
 
-      <a class="app" href="palette/wheel.html">
-        <span class="tag">Design tool</span>
-        <h3>Colour Theory Wheel</h3>
-        <p>The companion: an interactive wheel for picking a base hue and seeing
-           the classic harmonies — complementary, split, triadic, analogous —
-           laid out against it, drawn on canvas and computed in the same colour
-           space as the generator.</p>
-        <span class="stack">Canvas &middot; OKLCH &middot; no dependencies</span>
-        <span class="cta">Open the wheel &rarr;</span>
-      </a>
-
       <a class="app" href="https://carolynn-heil.onrender.com/settings.html">
         <span class="tag">Client-facing tool</span>
         <h3>Site style control panel</h3>
@@ -275,6 +265,26 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
         <span class="stack">OKLCH &middot; 7 harmony schemes &middot; no framework, no build step</span>
         <span class="cta">Change the colours &rarr;</span>
       </a>
+
+      <div class="app app-private">
+        <span class="tag">Confidential &middot; described, not linked</span>
+        <h3>Case documentation walls &mdash; BAM, the Lemmon Dociere</h3>
+        <p>Investigative and legal case systems: a visual wall where documents,
+           people, events and the connections between them are laid out,
+           annotated and re-arranged as a matter develops. One documented
+           architecture redeployed per case rather than rebuilt each time.</p>
+        <p>Each wall carries its own admin — a password-gated settings service
+           in plain Node with <b>no dependencies whatsoever</b>, using only
+           Node's own HTTP, SQLite and crypto modules. Every change is written
+           to a history table rather than over the previous value, so nothing is
+           silently lost and any edit can be walked back. Authentication is a
+           timing-safe comparison, and settings are namespaced per wall so one
+           service backs many.</p>
+        <span class="stack">Node &middot; SQLite &middot; zero npm dependencies &middot; versioned history</span>
+        <p class="why">No link, by design. These document real people who never
+           agreed to appear in a portfolio and cannot be asked. Happy to walk
+           through the architecture.</p>
+      </div>
 
       <a class="app" href="https://cymatic-decoder.onrender.com/">
         <span class="tag">Experiment</span>
@@ -337,28 +347,6 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
              courses and a full reservation engine. Lodging, dining, recreation and
              events served from one site.</p>
         </a>
-
-        <div class="item item-private">
-          <h3>The Lemmon Dociere &amp; related case walls</h3>
-          <span class="where">Confidential &middot; no public link</span>
-          <p>Case-documentation systems for investigative and legal work: a
-             visual wall where documents, people, events and the connections
-             between them are laid out, annotated and re-arranged as a matter
-             develops. One documented architecture, redeployed per case rather
-             than rebuilt — the same engine behind the data wall above.</p>
-          <p>Each wall carries its own admin: a password-gated settings service
-             in plain Node with <em>no dependencies at all</em> — Node's own
-             HTTP, SQLite and crypto modules, nothing from npm. Every change is
-             written to a history table rather than over the previous value, so
-             nothing is ever silently lost and any edit can be walked back.
-             Authentication is a timing-safe comparison; settings are namespaced
-             per wall, so one service backs many.</p>
-          <p class="why">Not linked, and it will not be. These document real
-             people who never agreed to appear in a portfolio and cannot be
-             asked — and redaction would not fix it, because the shape of a case
-             is the sensitive part, not just the names. Happy to talk through
-             the architecture.</p>
-        </div>
 
         <a class="item" href="https://cracksandracks.com/">
           <h3>Cracks &amp; Racks</h3>

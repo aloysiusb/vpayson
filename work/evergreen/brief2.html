@@ -129,6 +129,35 @@ a { color: var(--accent); }
   word-break: break-all;
 }
 
+/* Figures. The screenshots are real pages of the real app with invented
+   customers on them; the two drawn ones are drawn because a photograph of a
+   map with no map in it illustrates nothing. */
+figure { margin: 22px 0 26px; }
+figure img, figure svg {
+  display: block; width: 100%; height: auto;
+  border: 1px solid var(--border); border-radius: var(--r-card);
+  background: var(--surface);
+}
+figure.phone img, figure.phone svg { max-width: 300px; margin-inline: auto; }
+figcaption {
+  margin-top: 9px; font-size: 13.5px; line-height: 1.5;
+  color: var(--muted); max-width: 66ch;
+}
+figcaption b { color: var(--forest); font-weight: 600; }
+/* A numbered key under a drawing rather than leader lines across it: leaders
+   need room the page does not have on a phone. */
+.fig-key { margin: 10px 0 0; padding: 0; list-style: none; font-size: 13.5px; }
+.fig-key li {
+  display: flex; gap: 9px; align-items: baseline;
+  margin-bottom: 5px; max-width: 64ch;
+}
+.fig-key .n {
+  flex: 0 0 auto; width: 19px; height: 19px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  font-size: 11.5px; font-weight: 700; line-height: 19px; text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
 footer { margin-top: 46px; padding-top: 18px; border-top: 1px solid var(--border);
          color: var(--muted); font-size: 14px; }
 .site-foot {
@@ -201,6 +230,16 @@ footer { margin-top: 46px; padding-top: 18px; border-top: 1px solid var(--border
     <li><strong>Report a problem in one tap.</strong> Four buttons sit under each stop — Contamination, Overflow, Skip and Photo by default — and a second row of choices gives the detail. All of that wording is yours to set.</li>
     <li><strong>Add a note or a photo.</strong> A note lands in Driver Notes on the sheet. A photo opens the camera and appears on the dispatcher's board within seconds.</li>
   </ul>
+  <figure class="phone">
+    <img src="img/stops-phone.jpg" width="780" height="1600" loading="lazy"
+         alt="The stop list on a phone: a card for Oliphant, Grace at 82 Sopris Ave with a large green tick, seven round report buttons beneath it, and the driver's note underneath.">
+    <figcaption>
+      One stop, as a driver sees it. The tick marks it done; the round buttons
+      file a report in one tap; the note at the bottom is what the office wrote
+      plus whatever has been reported since. <b>Sample customers — this is not
+      a real round.</b>
+    </figcaption>
+  </figure>
   <p>
     Everything a driver taps is written back to the route sheet. Nothing is
     held only inside the app.
@@ -214,6 +253,95 @@ footer { margin-top: 46px; padding-top: 18px; border-top: 1px solid var(--border
     grid of streets rather than one driveway.
   </p>
   <p>The map is kept as clear as possible, so nearly everything is tucked away:</p>
+
+  <figure class="phone">
+    <svg viewBox="0 0 300 500" role="img"
+         aria-label="Diagram of the map screen: a green header carrying the progress count, the Stops and Map tabs and a Map tools button; below it the map, with a compass in the top-left corner, a road-report note across the top, and recentre and default-view buttons at the right.">
+      <title>What sits where on the map screen</title>
+      <!-- The map itself. Deliberately plain: this is a diagram of the
+           furniture, not a picture of the valley. -->
+      <rect x="0" y="0" width="300" height="500" fill="#e9efe9"/>
+      <g stroke="#cdd8ce" stroke-width="7" stroke-linecap="round">
+        <path d="M-10 250 H310"/><path d="M60 -10 V510"/>
+        <path d="M215 60 V510"/><path d="M-10 380 H310"/>
+      </g>
+      <!-- The round, drawn on it. -->
+      <path d="M60 250 L60 380 L215 380 L215 470" fill="none"
+            stroke="#2d7d4f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+      <g fill="#2d7d4f">
+        <circle cx="60" cy="250" r="6"/><circle cx="60" cy="380" r="6"/>
+        <circle cx="215" cy="380" r="6"/><circle cx="215" cy="470" r="6"/>
+      </g>
+
+      <!-- Header -->
+      <rect x="0" y="0" width="300" height="46" fill="#4a7c8c"/>
+      <circle cx="22" cy="23" r="13" fill="#5d8d9c"/>
+      <g stroke="#fff" stroke-width="1.8" stroke-linecap="round">
+        <path d="M16 19H28"/><path d="M16 23H28"/><path d="M16 27H28"/>
+      </g>
+      <text x="44" y="20" font-size="9" fill="#fff" font-family="sans-serif">2 of 6</text>
+      <text x="44" y="31" font-size="9" fill="#fff" font-family="sans-serif">done</text>
+      <rect x="82" y="10" width="46" height="26" rx="13" fill="#5d8d9c"/>
+      <text x="105" y="27" font-size="10" fill="#dfeaee" text-anchor="middle" font-family="sans-serif">Stops</text>
+      <rect x="130" y="10" width="46" height="26" rx="13" fill="#fff"/>
+      <text x="153" y="27" font-size="10" fill="#1b3a2a" text-anchor="middle" font-weight="bold" font-family="sans-serif">Map</text>
+      <rect x="198" y="10" width="88" height="26" rx="13" fill="none" stroke="#fff" stroke-width="1.5"/>
+      <text x="242" y="27" font-size="10" fill="#fff" text-anchor="middle" font-weight="bold" font-family="sans-serif">☰ Tools</text>
+
+      <!-- Road-report note. Stops short of the right edge so the key's
+           markers have somewhere to stand that is not on top of it. -->
+      <rect x="58" y="54" width="194" height="38" rx="9" fill="#fff" fill-opacity="0.72"/>
+      <text x="66" y="70" font-size="9" fill="#1c2a21" font-family="sans-serif">⚠ Ice on Prince Creek · 2.1 mi</text>
+      <text x="66" y="84" font-size="9" fill="#1c2a21" font-family="sans-serif">🚧 Roadworks · 4 mi</text>
+
+      <!-- Compass -->
+      <circle cx="30" cy="73" r="20" fill="#0e120f" fill-opacity="0.18" stroke="#fff" stroke-width="1.2"/>
+      <polygon points="30,58 26,75 34,75" fill="#ef4444"/>
+      <polygon points="30,88 26,75 34,75" fill="#fff" fill-opacity="0.9"/>
+      <text x="30" y="55" font-size="7" fill="#fff" text-anchor="middle" font-family="sans-serif">N</text>
+
+      <!-- Recentre / default view -->
+      <circle cx="268" cy="300" r="18" fill="#fff" fill-opacity="0.92"/>
+      <circle cx="268" cy="300" r="6" fill="none" stroke="#1b3a2a" stroke-width="2"/>
+      <circle cx="268" cy="300" r="1.8" fill="#1b3a2a"/>
+      <circle cx="268" cy="346" r="18" fill="#fff" fill-opacity="0.92"/>
+      <rect x="260" y="338" width="16" height="16" rx="3" fill="none" stroke="#1b3a2a" stroke-width="2"/>
+
+      <!-- The truck -->
+      <circle cx="60" cy="330" r="9" fill="#2d7d4f" stroke="#fff" stroke-width="3"/>
+
+      <!-- Numbered markers, keyed underneath. Beside what they label, never
+           on it: a marker sitting on the compass hides the compass, which is
+           the one thing that figure exists to show. -->
+      <g stroke="#1b3a2a" stroke-width="1.2" opacity="0.65">
+        <path d="M272 46 V52"/>
+        <path d="M30 100 V96"/>
+        <path d="M150 112 V96"/>
+        <path d="M246 300 H250"/>
+        <path d="M82 330 H71"/>
+      </g>
+      <g font-family="'IBM Plex Mono', monospace" font-size="11" font-weight="bold" text-anchor="middle">
+        <circle cx="272" cy="63" r="11" fill="#1b3a2a"/><text x="272" y="67" fill="#fff">1</text>
+        <circle cx="30"  cy="111" r="11" fill="#1b3a2a"/><text x="30"  y="115" fill="#fff">2</text>
+        <circle cx="150" cy="123" r="11" fill="#1b3a2a"/><text x="150" y="127" fill="#fff">3</text>
+        <circle cx="235" cy="300" r="11" fill="#1b3a2a"/><text x="235" y="304" fill="#fff">4</text>
+        <circle cx="93"  cy="330" r="11" fill="#1b3a2a"/><text x="93"  y="334" fill="#fff">5</text>
+      </g>
+    </svg>
+    <ol class="fig-key">
+      <li><span class="n">1</span><span><b>Map tools.</b> Eleven controls, folded away in the header rather than sitting on the road.</span></li>
+      <li><span class="n">2</span><span><b>Compass.</b> The red half is the way you are pointing. Tap for GPS coordinates.</span></li>
+      <li><span class="n">3</span><span><b>Road reports.</b> What other drivers have flagged, nearest first, with a button to put it away.</span></li>
+      <li><span class="n">4</span><span><b>Recentre</b> and <b>default view</b> — back to the truck, or back out to the whole round.</span></li>
+      <li><span class="n">5</span><span><b>The truck,</b> on the round it is driving.</span></li>
+    </ol>
+    <figcaption>
+      A drawing rather than a screenshot, because the map's own tiles come from
+      Google and cannot be reproduced here. Everything labelled is real and in
+      the place shown.
+    </figcaption>
+  </figure>
+
   <ul>
     <li><strong>☰ Map tools</strong>, in the green header on the right. It opens downward over the page, not over the map, and holds the eleven controls: Driving view, Whole round, Directions, Default view, Sheet order, Satellite and the rest.</li>
     <li><strong>A compass</strong>, small and see-through in the top-left corner. The needle's red half is the way the truck is pointing. Tapping it shows the GPS coordinates for eight seconds and copies them — which is what you want when reading a position over the radio. On a wide screen the coordinates are simply there.</li>
@@ -308,6 +436,16 @@ footer { margin-top: 46px; padding-top: 18px; border-top: 1px solid var(--border
     refreshing.
   </p>
 
+  <figure>
+    <img src="img/board-light.jpg" width="2320" height="1960" loading="lazy"
+         alt="The dispatcher board: a day's feed of stops done, notes and reports in alternating ruled rows, above a grid of route cards each showing stops done, a progress bar, the current stop and the reports filed.">
+    <figcaption>
+      The board in daylight. The ruled feed runs newest first down the top; the
+      route cards below carry each round's progress, its current stop, and what
+      has been reported on it. <b>Sample customers and a sample day.</b>
+    </figcaption>
+  </figure>
+
   <h3>Down the page, in order</h3>
   <ul>
     <li><strong>On the road now</strong> — a map of the trucks currently sharing their position.</li>
@@ -346,6 +484,57 @@ footer { margin-top: 46px; padding-top: 18px; border-top: 1px solid var(--border
     A customer fills in a form on the website and, if you approve it, they are
     written onto the route sheet. No retyping.
   </p>
+
+  <figure>
+    <svg viewBox="0 0 300 310" role="img"
+         aria-label="Flow diagram: a website form leads to the waiting queue, which notifies the office and shows on the dispatcher board; the office approves or declines on the Approvals page; approving a new customer appends a row to the route sheet, and only then is the request marked approved.">
+      <title>How a customer request reaches the route sheet</title>
+      <defs>
+        <marker id="fa" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#64786b"/>
+        </marker>
+      </defs>
+      <!-- Its own light ground, so the drawing reads the same in dark mode.
+           Without it the amber line at the foot sat dark-on-dark. -->
+      <rect x="0" y="0" width="300" height="310" fill="#f7f8f6"/>
+      <g font-family="'IBM Plex Sans', sans-serif" text-anchor="middle">
+        <g stroke="#64786b" stroke-width="1.6" marker-end="url(#fa)" fill="none">
+          <path d="M150 46 V68"/><path d="M150 122 V144"/><path d="M150 198 V220"/>
+        </g>
+
+        <rect x="34" y="8" width="232" height="38" rx="7" fill="#e3f0e8" stroke="#2d7d4f" stroke-width="1.4"/>
+        <text x="150" y="26" font-size="11" font-weight="600" fill="#1b3a2a">The website form</text>
+        <text x="150" y="39" font-size="9" fill="#64786b">New customer · hold · missed · details</text>
+
+        <rect x="34" y="70" width="232" height="52" rx="7" fill="#fff" stroke="#dde3d9" stroke-width="1.4"/>
+        <text x="150" y="88" font-size="11" font-weight="600" fill="#1b3a2a">The waiting queue</text>
+        <text x="150" y="101" font-size="9" fill="#64786b">Email to the office</text>
+        <text x="150" y="114" font-size="9" fill="#64786b">and onto the board, the same moment</text>
+
+        <rect x="34" y="146" width="232" height="52" rx="7" fill="#fff" stroke="#dde3d9" stroke-width="1.4"/>
+        <text x="150" y="164" font-size="11" font-weight="600" fill="#1b3a2a">You decide it — /approval</text>
+        <text x="150" y="177" font-size="9" fill="#64786b">Approve or decline. A hold or a missed</text>
+        <text x="150" y="190" font-size="9" fill="#64786b">pickup means handled, not added</text>
+
+        <rect x="34" y="222" width="232" height="52" rx="7" fill="#e3f0e8" stroke="#2d7d4f" stroke-width="1.6"/>
+        <text x="150" y="240" font-size="11" font-weight="600" fill="#1b3a2a">The route sheet</text>
+        <text x="150" y="253" font-size="9" fill="#64786b">A new customer appended — right tab,</text>
+        <text x="150" y="266" font-size="9" fill="#64786b">right columns, on the round you pick</text>
+
+        <text x="150" y="292" font-size="9" font-style="italic" fill="#b45309">
+          The sheet is written first. If that fails, it stays in the queue.
+        </text>
+      </g>
+    </svg>
+    <figcaption>
+      The whole path, website to round. The last line is the part worth
+      trusting: <b>nobody can be lost between the queue and the route</b>,
+      because a request is only marked approved once the sheet has actually
+      taken the row.
+    </figcaption>
+  </figure>
+
   <div class="step">
     <h3>1 · The customer submits</h3>
     <p>Four kinds are accepted: <strong>new customer</strong>, <strong>service hold</strong>, <strong>missed pickup</strong> and <strong>update details</strong>.</p>

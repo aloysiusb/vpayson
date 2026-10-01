@@ -187,6 +187,12 @@ body {
 .gsp-palette-section { margin-bottom: var(--gsp-section-gap); }
 .gsp-section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .gsp-section-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; border: 0.5px solid rgba(255,255,255,0.1); }
+/* What produced this family: the rotation off the picked hue, and where it
+   landed. Mono so the degrees line up down the page. */
+.gsp-section-driver {
+  margin-left: auto; font-family: var(--gsp-font-mono); font-size: 10px;
+  color: var(--gsp-text-muted); letter-spacing: 0.04em; white-space: nowrap;
+}
 .gsp-section-name { font-family: var(--gsp-font-display); font-size: 1rem; font-weight: var(--w-display); letter-spacing: 0.04em; color: var(--gsp-text-secondary); }
 .gsp-chips-row { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; scrollbar-color: var(--gsp-ctrl-border) transparent; }
 .gsp-chip { flex: 1; min-width: 62px; height: var(--gsp-chip-height); border-radius: var(--gsp-chip-radius); padding: 8px 9px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 0.5px solid var(--gsp-chip-border); transition: transform .13s ease,border-color .13s; position: relative; overflow: hidden; flex-shrink: 0; }
@@ -329,10 +335,10 @@ body {
     {name:'900',L:0.145,cScale:0.22,role:'Deep'},
   ];
 
-  function buildFamily(H, maxC, anchorL, label, sub) {
+  function buildFamily(H, maxC, anchorL, label, sub, offset) {
     const shift = anchorL - 0.590;
     const steps = BASE_STEPS.map(s=>({...s, L:Math.max(0.04,Math.min(0.97,s.L+shift))}));
-    return { label, sub, H,
+    return { label, sub, H, offset,
       chips: steps.map(s=>{
         const hex=oklch(s.L,maxC*s.cScale,H);
         return{...s,hex,H,C:maxC*s.cScale,ink:isLight(hex)?'#1a1a1e':'#f2ede6'};
@@ -363,7 +369,7 @@ body {
         defs.push({label:'Tetrad (3)',sub:'H + 270°',offset:270});
       }
     }
-    return defs.map(d=>buildFamily((H+d.offset)%360,maxC,anchorL,d.label,d.sub));
+    return defs.map(d=>buildFamily((H+d.offset)%360,maxC,anchorL,d.label,d.sub,d.offset));
   }
 
   /* ── Canvas spiral ────────────────────────────────────────── */
@@ -698,6 +704,9 @@ body {
       const dot=document.createElement('div');dot.className='gsp-section-dot';dot.style.background=fam.chips[4].hex;
       hdr.appendChild(dot);
       const nm=document.createElement('span');nm.className='gsp-section-name';nm.textContent=fam.label;hdr.appendChild(nm);
+      const drv=document.createElement('span');drv.className='gsp-section-driver';
+      drv.textContent=(fam.offset ? 'base + '+fam.offset+'°' : 'your base hue')+'  ·  H '+Math.round(fam.H)+'°';
+      hdr.appendChild(drv);
       sec.appendChild(hdr);
       const row=document.createElement('div');row.className='gsp-chips-row';
       fam.chips.forEach(c=>{

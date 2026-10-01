@@ -5,7 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Golden Section Palette</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,100..1000&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script>
+/* Theme overrides saved from /settings.html, applied before paint. */
+(function(){
+  try{
+    var t = JSON.parse(localStorage.getItem('vp_theme') || '{}'), r = document.documentElement;
+    if(t.fontStack) r.style.setProperty('--font', t.fontStack);
+    if(t.vars) for(var k in t.vars) r.style.setProperty(k, t.vars[k]);
+    if(t.fontHref){
+      var l = document.createElement('link');
+      l.rel = 'stylesheet'; l.href = t.fontHref;
+      document.head.appendChild(l);
+    }
+  }catch(e){}
+})();
+</script>
 <style>
 /* ═══════════════════════════════════════════════════════════════
    GOLDEN SECTION PALETTE — Web Component v3
@@ -16,8 +32,18 @@
   --gsp-bg:              #0c0b0f;
   --gsp-canvas-bg:       #0f0e12;
 
-  /* ── Typography ──────────────────────────────────── */
-  --gsp-font-display:    'Cormorant Garamond', Georgia, serif;
+  /* ── Typography ──────────────────────────────────────
+     --font and the weights are the site-wide tokens, so the typeface and
+     weight pickers on /settings.html reach this page too. DM Mono is kept
+     for hex values only. */
+  --font: "Google Sans Flex", "Google Sans", ui-sans-serif, system-ui,
+          -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --w-display: 300;
+  --w-body:    380;
+  --w-label:   700;
+
+  --gsp-font-display:    var(--font);
+  --gsp-font-ui:         var(--font);
   --gsp-font-mono:       'DM Mono', 'Courier New', monospace;
   --gsp-text-primary:    rgba(240,236,228,0.92);
   --gsp-text-secondary:  rgba(200,195,185,0.65);
@@ -43,16 +69,21 @@
 
   /* ── Layout ──────────────────────────────────────── */
   --gsp-gap:             8px;
-  --gsp-section-gap:     1.4rem;
+  --gsp-phi:             1.618;
+  --gsp-v1:              .62rem;
+  --gsp-v2:              calc(var(--gsp-v1) * var(--gsp-phi));
+  --gsp-v3:              calc(var(--gsp-v1) * var(--gsp-phi) * var(--gsp-phi));
+  --gsp-section-gap:     var(--gsp-v2);
   --gsp-max-width:       940px;
-  --gsp-padding:         2rem 1.5rem;
+  --gsp-padding:         var(--gsp-v3) 1.5rem;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   background: var(--gsp-bg);
   color: var(--gsp-text-primary);
-  font-family: var(--gsp-font-mono);
+  font-family: var(--gsp-font-ui);
+  font-weight: var(--w-body);
   min-height: 100vh;
   display: flex; flex-direction: column; align-items: center;
   padding: var(--gsp-padding);
@@ -62,11 +93,11 @@ body {
 /* ── Header ──────────────────────────────────────────────── */
 .gsp-header {
   display: flex; justify-content: space-between; align-items: flex-end;
-  margin-bottom: 1.4rem; flex-wrap: wrap; gap: 1rem;
+  margin-bottom: var(--gsp-v2); flex-wrap: wrap; gap: 1rem;
 }
-.gsp-title { font-family: var(--gsp-font-display); font-weight: 300; font-size: clamp(1.4rem,4vw,2rem); letter-spacing: 0.02em; }
+.gsp-title { font-family: var(--gsp-font-display); font-weight: var(--w-display); font-size: clamp(1.4rem,4vw,2rem); letter-spacing: 0.02em; }
 .gsp-title em { font-style: italic; opacity: 0.65; }
-.gsp-phi-badge { font-family: var(--gsp-font-display); font-size: 1.6rem; font-weight: 300; color: var(--gsp-text-muted); }
+.gsp-phi-badge { font-family: var(--gsp-font-display); font-size: 1.6rem; font-weight: var(--w-display); color: var(--gsp-text-muted); }
 
 /* Way back out to the other tool and the portfolio this is shown from. */
 .gsp-nav { font-size: 10.5px; color: var(--gsp-text-muted); letter-spacing: 0.05em; margin-top: 4px; }
@@ -74,22 +105,22 @@ body {
 .gsp-nav a:hover { color: var(--gsp-text-secondary); }
 
 /* ── Controls ────────────────────────────────────────────── */
-.gsp-controls { display: flex; gap: var(--gsp-gap); align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+.gsp-controls { display: flex; gap: var(--gsp-gap); align-items: center; flex-wrap: wrap; margin-bottom: var(--gsp-v1); }
 .gsp-label { font-size: 11px; color: var(--gsp-text-secondary); letter-spacing: 0.08em; text-transform: uppercase; }
 .gsp-color-wrap { position: relative; width: 32px; height: 26px; }
 .gsp-color-wrap input[type="color"] { opacity: 0; position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; border: none; }
 .gsp-color-swatch { position: absolute; inset: 0; border-radius: var(--gsp-ctrl-radius); border: 1px solid var(--gsp-ctrl-border); pointer-events: none; transition: background 0.2s; }
 .gsp-hue-label { font-size: 11px; color: var(--gsp-text-muted); min-width: 108px; }
-.gsp-btn { font-family: var(--gsp-font-mono); font-size: 12px; color: var(--gsp-text-secondary); background: var(--gsp-ctrl-bg); border: 1px solid var(--gsp-ctrl-border); border-radius: var(--gsp-ctrl-radius); padding: 5px 12px; cursor: pointer; transition: background .15s,color .15s,border-color .15s; letter-spacing: 0.04em; }
+.gsp-btn { font-family: var(--gsp-font-ui); font-size: 12px; color: var(--gsp-text-secondary); background: var(--gsp-ctrl-bg); border: 1px solid var(--gsp-ctrl-border); border-radius: var(--gsp-ctrl-radius); padding: 5px 12px; cursor: pointer; transition: background .15s,color .15s,border-color .15s; letter-spacing: 0.04em; }
 .gsp-btn:hover { background: var(--gsp-ctrl-hover); color: var(--gsp-text-primary); border-color: var(--gsp-ctrl-active-bdr); }
 .gsp-btn.active { background: var(--gsp-ctrl-active-bg); color: var(--gsp-text-primary); border-color: var(--gsp-ctrl-active-bdr); }
 .gsp-sep { width: 1px; height: 18px; background: var(--gsp-ctrl-border); flex-shrink: 0; }
 .gsp-mode-note { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; color: var(--gsp-text-muted); letter-spacing: 0.04em; padding: 3px 9px; border: 1px solid var(--gsp-ctrl-border); border-radius: 20px; }
 .gsp-mode-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.6; }
-.gsp-schemes { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 1rem; }
+.gsp-schemes { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: var(--gsp-v2); }
 
 /* ── Canvas ──────────────────────────────────────────────── */
-.gsp-canvas-wrap { border-radius: 12px; overflow: hidden; border: 1px solid var(--gsp-ctrl-border); margin-bottom: 1.2rem; background: var(--gsp-canvas-bg); }
+.gsp-canvas-wrap { border-radius: 12px; overflow: hidden; border: 1px solid var(--gsp-ctrl-border); margin-bottom: var(--gsp-v1); background: var(--gsp-canvas-bg); }
 .gsp-canvas-wrap canvas { display: block; width: 100%; height: auto; }
 
 /* ═══════════════════════════════════════════════════════════
@@ -97,7 +128,7 @@ body {
    Rows grow as the widget widens. Each row is 1/φ the height
    of the row above it. Panels use φ flex ratios.
 ═══════════════════════════════════════════════════════════ */
-.gsp-showcase-wrap { margin-bottom: 1.4rem; }
+.gsp-showcase-wrap { margin-bottom: var(--gsp-v2); }
 
 /* The grid container */
 .gsp-showcase {
@@ -123,6 +154,10 @@ body {
   min-width: 0;
 }
 .gsp-sc-panel:hover { filter: brightness(1.08); transform: scale(1.012); z-index: 1; }
+/* The shortest rows in the φ cascade: less padding and a smaller label, so
+   the text fits the box instead of being clipped by it. */
+.gsp-sc-panel.sc-tight { padding: 5px 10px; }
+.gsp-sc-panel.sc-tight .sc-role { font-size: 0.70rem; margin-bottom: 0; }
 .gsp-sc-panel.copied::after {
   content: 'copied';
   position: absolute; inset: 0;
@@ -143,7 +178,7 @@ body {
 .gsp-iter-chip .ic-step  { font-size: 9px; opacity: 0.30; margin-left: 5px; }
 
 /* ── Story bar ───────────────────────────────────────────── */
-.gsp-story { display: flex; gap: 4px; margin-bottom: 1.2rem; }
+.gsp-story { display: flex; gap: 4px; margin-bottom: var(--gsp-v2); }
 .gsp-story-chip { flex: 1; height: 52px; border-radius: 8px; display: flex; align-items: flex-end; padding: 6px 8px; cursor: pointer; min-width: 44px; border: 0.5px solid rgba(255,255,255,0.08); transition: transform 0.13s; }
 .gsp-story-chip:hover { transform: translateY(-2px); }
 .gsp-story-label { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.72; white-space: nowrap; overflow: hidden; }
@@ -152,7 +187,7 @@ body {
 .gsp-palette-section { margin-bottom: var(--gsp-section-gap); }
 .gsp-section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .gsp-section-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; border: 0.5px solid rgba(255,255,255,0.1); }
-.gsp-section-name { font-family: var(--gsp-font-display); font-size: 1rem; font-weight: 400; letter-spacing: 0.04em; }
+.gsp-section-name { font-family: var(--gsp-font-display); font-size: 1rem; font-weight: var(--w-display); letter-spacing: 0.04em; color: var(--gsp-text-secondary); }
 .gsp-chips-row { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; scrollbar-color: var(--gsp-ctrl-border) transparent; }
 .gsp-chip { flex: 1; min-width: 62px; height: var(--gsp-chip-height); border-radius: var(--gsp-chip-radius); padding: 8px 9px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 0.5px solid var(--gsp-chip-border); transition: transform .13s ease,border-color .13s; position: relative; overflow: hidden; flex-shrink: 0; }
 .gsp-chip:hover { transform: translateY(-3px) scale(1.03); border-color: rgba(255,255,255,0.25); z-index: 1; }
@@ -162,13 +197,18 @@ body {
 .gsp-chip-role { font-size: 9px; opacity: 0.45; margin-top: 1px; }
 
 /* ── Footer ──────────────────────────────────────────────── */
-.gsp-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 1.4rem; padding-top: 1rem; border-top: 1px solid var(--gsp-ctrl-border); flex-wrap: wrap; gap: 8px; }
+.gsp-footer { display: flex; justify-content: space-between; align-items: center; margin-top: var(--gsp-v2); padding-top: var(--gsp-v1); border-top: 1px solid var(--gsp-ctrl-border); flex-wrap: wrap; gap: 8px; }
 .gsp-footer-note { font-size: 10px; color: var(--gsp-text-muted); letter-spacing: 0.05em; line-height: 1.7; }
-.gsp-css-btn { font-family: var(--gsp-font-mono); font-size: 11px; color: var(--gsp-text-muted); background: transparent; border: 1px solid var(--gsp-ctrl-border); border-radius: var(--gsp-ctrl-radius); padding: 5px 12px; cursor: pointer; letter-spacing: 0.05em; transition: all 0.15s; }
+.gsp-phi-close {
+  font-family: var(--gsp-font-display); font-weight: var(--w-display);
+  font-size: 1.6rem; line-height: 1; color: var(--gsp-text-muted);
+  text-align: center; margin-block-start: var(--gsp-v3);
+}
+.gsp-css-btn { font-family: var(--gsp-font-ui); font-size: 11px; color: var(--gsp-text-muted); background: transparent; border: 1px solid var(--gsp-ctrl-border); border-radius: var(--gsp-ctrl-radius); padding: 5px 12px; cursor: pointer; letter-spacing: 0.05em; transition: all 0.15s; }
 .gsp-css-btn:hover { color: var(--gsp-text-primary); border-color: var(--gsp-ctrl-active-bdr); }
 
 @media (max-width: 560px) {
-  :root { --gsp-chip-height: 76px; --gsp-padding: 1.2rem 1rem; --gsp-showcase-row-h: 90px; }
+  :root { --gsp-chip-height: 76px; --gsp-padding: var(--gsp-v2) 1rem; --gsp-showcase-row-h: 90px; }
   .gsp-chip { min-width: 50px; }
   .gsp-chip-role, .gsp-sc-panel .sc-hex { display: none; }
 }
@@ -226,6 +266,8 @@ body {
     </p>
     <button class="gsp-css-btn" id="gsp-css">Export CSS vars</button>
   </footer>
+
+  <p class="gsp-phi-close" aria-hidden="true">φ</p>
 </div>
 
 <script>
@@ -598,12 +640,14 @@ body {
         const p = document.createElement('div');
         p.className='gsp-sc-panel';
         p.style.cssText=`background:${chip.hex};flex:${flex.toFixed(4)};`;
-        // Show family name label on taller rows
+        // Detail drops away as the rows shorten, so nothing is ever clipped.
         const showName = rh(r) > 80;
+        const showHex  = rh(r) > 60;
+        if (rh(r) < 48) p.classList.add('sc-tight');
         p.innerHTML=`
           ${showName?`<span class="sc-name" style="color:${chip.ink};">${chip.role}</span>`:''}
           <span class="sc-role" style="color:${chip.ink};">${role}</span>
-          <span class="sc-hex"  style="color:${chip.ink};">${chip.hex}</span>`;
+          ${showHex?`<span class="sc-hex"  style="color:${chip.ink};">${chip.hex}</span>`:''}`;
         p.title='Click to copy '+chip.hex;
         p.addEventListener('click',()=>copyAndFlash(chip.hex,p));
         row.appendChild(p);

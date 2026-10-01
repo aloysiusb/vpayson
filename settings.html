@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings — Virginia P. Payson</title>
+<meta name="description" content="Re-tone this site: brand hue, colour intensity, accent and typeface. Changes preview live and save to your own browser.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%231f5c47'/><text y='.72em' x='50%25' text-anchor='middle' font-size='62' font-family='system-ui' fill='%23fff'>V</text></svg>">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,100..1000&display=swap" rel="stylesheet">
+<script>
+/* Same applier as every other page, so this one opens already wearing
+   whatever is saved. See the note at the bottom of the page. */
+(function(){
+  try{
+    var t = JSON.parse(localStorage.getItem('vp_theme') || '{}'), r = document.documentElement;
+    if(t.hue != null)       r.style.setProperty('--hue', t.hue);
+    if(t.chroma != null)    r.style.setProperty('--chroma', t.chroma);
+    if(t.accentHue != null) r.style.setProperty('--accent-hue', t.accentHue);
+    if(t.fontStack)         r.style.setProperty('--font', t.fontStack);
+    if(t.fontHref){
+      var l = document.createElement('link');
+      l.rel = 'stylesheet'; l.href = t.fontHref;
+      document.head.appendChild(l);
+    }
+  }catch(e){}
+})();
+</script>
+
+<style>
+/* Same tokens as every other page — one system, standalone file. */
+:root{
+  --hue: 158;
+  --chroma: .06;
+
+  --ink:        oklch(22% .02 var(--hue));
+  --ink-soft:   oklch(42% .015 var(--hue));
+  --ink-faint:  oklch(58% .012 var(--hue));
+  --paper:      oklch(99% .004 var(--hue));
+  --paper-alt:  oklch(96.5% .008 var(--hue));
+  --rule:       oklch(89% .012 var(--hue));
+  --brand:      oklch(43% var(--chroma) var(--hue));
+  --brand-soft: oklch(95% .022 var(--hue));
+  --accent-hue: 48;
+  --accent:     oklch(55% .13 var(--accent-hue));
+
+  --measure: 34rem;
+  --gutter: clamp(1.25rem, 5vw, 4rem);
+  --shell: 62rem;
+
+  --step--1: clamp(.82rem, .79rem + .14vw, .89rem);
+  --step-0:  clamp(1rem, .96rem + .2vw, 1.09rem);
+  --step-1:  clamp(1.2rem, 1.12rem + .4vw, 1.45rem);
+  --step-2:  clamp(1.55rem, 1.36rem + .95vw, 2.15rem);
+  --step-3:  clamp(2.1rem, 1.6rem + 2.5vw, 3.6rem);
+
+  --font: "Google Sans Flex", "Google Sans", ui-sans-serif, system-ui,
+          -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:        oklch(93% .012 var(--hue));
+    --ink-soft:   oklch(75% .014 var(--hue));
+    --ink-faint:  oklch(60% .012 var(--hue));
+    --paper:      oklch(17% .014 var(--hue));
+    --paper-alt:  oklch(21% .018 var(--hue));
+    --rule:       oklch(30% .018 var(--hue));
+    --brand:      oklch(78% .09 var(--hue));
+    --brand-soft: oklch(26% .03 var(--hue));
+    --accent:     oklch(72% .12 var(--accent-hue));
+  }
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--font); font-size:var(--step-0); line-height:1.6;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+h1,h2,h3{line-height:1.14; margin:0; font-weight:600; letter-spacing:-.02em; text-wrap:balance}
+p{margin:0; text-wrap:pretty}
+a{color:inherit}
+:focus-visible{outline:2.5px solid var(--accent); outline-offset:3px; border-radius:2px}
+
+.shell{max-width:var(--shell); margin-inline:auto; padding-inline:var(--gutter)}
+.crumb{padding-block:1.5rem .5rem; font-size:var(--step--1); color:var(--ink-faint)}
+.crumb a{color:var(--brand); text-decoration-thickness:1px; text-underline-offset:.2em}
+
+.hero{padding-block:clamp(1.5rem,5vh,2.5rem) clamp(1.5rem,4vh,2.5rem)}
+.eyebrow{
+  font-size:var(--step--1); font-weight:600; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--brand); margin:0 0 1.2rem;
+}
+.hero h1{font-size:var(--step-2)}
+.lede{font-size:var(--step-0); color:var(--ink-soft); max-width:var(--measure); margin-block-start:1rem}
+
+section{padding-block:clamp(1.5rem,4vh,2.5rem)}
+.band{background:var(--paper-alt); border-block:1px solid var(--rule)}
+.section-head{
+  font-size:var(--step--1); font-weight:600; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-faint); margin:0 0 1.5rem;
+}
+
+/* ─────────────────────────────  CONTROLS  ───────────────────────── */
+.controls{display:grid; gap:1.75rem; max-width:var(--measure)}
+.control{display:grid; gap:.5rem}
+.control-top{display:flex; justify-content:space-between; align-items:baseline; gap:1rem}
+.control label{font-weight:600; font-size:var(--step-0)}
+.control output{
+  font-family:var(--mono); font-size:var(--step--1); color:var(--ink-faint);
+  font-variant-numeric:tabular-nums;
+}
+.control .hint{font-size:var(--step--1); color:var(--ink-faint)}
+
+input[type=range]{
+  -webkit-appearance:none; appearance:none; width:100%; height:1.6rem;
+  background:none; cursor:pointer; margin:0;
+}
+input[type=range]::-webkit-slider-runnable-track{
+  height:.5rem; border-radius:99px; border:1px solid var(--rule);
+}
+input[type=range]::-moz-range-track{
+  height:.5rem; border-radius:99px; border:1px solid var(--rule);
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; appearance:none; width:1.35rem; height:1.35rem;
+  margin-top:-.48rem; border-radius:50%;
+  background:var(--paper); border:3px solid var(--brand);
+}
+input[type=range]::-moz-range-thumb{
+  width:1.35rem; height:1.35rem; border-radius:50%; box-sizing:border-box;
+  background:var(--paper); border:3px solid var(--brand);
+}
+/* The hue track shows the actual choice rather than a grey bar. Each vendor
+   pseudo-element needs its own rule: one invalid selector in a list drops the
+   whole rule, and each browser rejects the other's. */
+#hue::-webkit-slider-runnable-track{
+  background:linear-gradient(to right,
+    oklch(60% .14 0), oklch(60% .14 60), oklch(60% .14 120), oklch(60% .14 180),
+    oklch(60% .14 240), oklch(60% .14 300), oklch(60% .14 360));
+}
+#hue::-moz-range-track{
+  background:linear-gradient(to right,
+    oklch(60% .14 0), oklch(60% .14 60), oklch(60% .14 120), oklch(60% .14 180),
+    oklch(60% .14 240), oklch(60% .14 300), oklch(60% .14 360));
+}
+#accentHue::-webkit-slider-runnable-track{
+  background:linear-gradient(to right,
+    oklch(60% .14 0), oklch(60% .14 60), oklch(60% .14 120), oklch(60% .14 180),
+    oklch(60% .14 240), oklch(60% .14 300), oklch(60% .14 360));
+}
+#accentHue::-moz-range-track{
+  background:linear-gradient(to right,
+    oklch(60% .14 0), oklch(60% .14 60), oklch(60% .14 120), oklch(60% .14 180),
+    oklch(60% .14 240), oklch(60% .14 300), oklch(60% .14 360));
+}
+#chroma::-webkit-slider-runnable-track{
+  background:linear-gradient(to right,
+    oklch(60% 0 var(--hue)), oklch(60% .14 var(--hue)));
+}
+#chroma::-moz-range-track{
+  background:linear-gradient(to right,
+    oklch(60% 0 var(--hue)), oklch(60% .14 var(--hue)));
+}
+
+select{
+  font-family:inherit; font-size:var(--step-0); color:var(--ink);
+  background:var(--paper); border:1px solid var(--rule); border-radius:10px;
+  padding:.7rem .9rem; width:100%;
+}
+
+.actions{display:flex; flex-wrap:wrap; gap:.75rem; margin-block-start:2rem}
+.btn{
+  font-family:inherit; font-size:var(--step-0); font-weight:600;
+  background:var(--brand); color:var(--paper); border:1.5px solid var(--brand);
+  padding:.75rem 1.4rem; border-radius:99px; cursor:pointer;
+  transition:transform .16s ease, background .16s ease;
+}
+.btn:hover,.btn:focus-visible{background:var(--accent); border-color:var(--accent); transform:translateY(-1px)}
+.btn-quiet{background:none; color:var(--brand); border-color:var(--rule)}
+.btn-quiet:hover,.btn-quiet:focus-visible{background:var(--brand-soft); color:var(--brand); border-color:var(--brand)}
+.said{font-size:var(--step--1); color:var(--brand); align-self:center; min-height:1.4em}
+
+/* ─────────────────────────────  PREVIEW  ────────────────────────── */
+.preview{display:grid; gap:1.25rem}
+.pv-card{
+  padding:1.4rem; border:1px solid var(--rule); border-radius:14px;
+  background:var(--paper); display:grid; gap:.5rem;
+}
+.pv-card.lead{background:var(--brand-soft); border-color:var(--brand)}
+.pv-tag{
+  font-size:var(--step--1); font-weight:600; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--brand);
+}
+.pv-card h3{font-size:var(--step-1)}
+.pv-card p{color:var(--ink-soft); font-size:var(--step--1)}
+.pv-cta{color:var(--brand); font-weight:600}
+.pv-row{
+  display:grid; grid-template-columns:1fr auto; gap:.15rem .5rem;
+  padding-block:1.1rem; border-block:1px solid var(--rule); align-items:baseline;
+}
+.pv-row h3{font-size:var(--step-1)}
+.pv-row .where{font-size:var(--step--1); color:var(--ink-faint)}
+.pv-row p{grid-column:1/-1; color:var(--ink-soft); font-size:var(--step--1); margin-block-start:.3rem}
+.phi{display:flex; gap:.4rem; height:.4rem}
+.phi span{background:var(--brand); border-radius:99px}
+.phi span:nth-child(1){flex:1.618}
+.phi span:nth-child(2){flex:1; opacity:.6}
+.phi span:nth-child(3){flex:.618; opacity:.4}
+.phi span:nth-child(4){flex:.382; opacity:.25}
+.phi span:nth-child(5){flex:.236; opacity:.15}
+
+/* ──────────────────────────────  CSS OUT  ───────────────────────── */
+.out{
+  font-family:var(--mono); font-size:var(--step--1); line-height:1.65;
+  background:var(--paper); color:var(--ink);
+  border:1px solid var(--rule); border-radius:12px;
+  padding:1.1rem; width:100%; max-width:var(--measure);
+  white-space:pre; overflow-x:auto; display:block;
+}
+.note{
+  border-inline-start:3px solid var(--brand); padding:.2rem 0 .2rem 1.1rem;
+  color:var(--ink-soft); font-size:var(--step--1); max-width:var(--measure);
+}
+.note + .note{margin-block-start:1rem}
+
+footer{
+  padding-block:2.25rem 3rem; border-block-start:1px solid var(--rule);
+  font-size:var(--step--1); color:var(--ink-faint);
+  display:flex; flex-wrap:wrap; gap:.4rem 1.5rem; justify-content:space-between;
+}
+footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickness:1px}
+
+@media (min-width:52rem){
+  .split{display:grid; grid-template-columns:var(--measure) 1fr; gap:3.5rem; align-items:start}
+}
+@media (prefers-reduced-motion: reduce){
+  *{animation:none !important; transition:none !important}
+}
+</style>
+</head>
+<body>
+
+<main>
+
+  <nav class="crumb shell" aria-label="Breadcrumb">
+    <a href="/">Virginia P. Payson</a> &rsaquo; Settings
+  </nav>
+
+  <header class="hero shell">
+    <p class="eyebrow">Site settings</p>
+    <h1>Re-tone the whole site</h1>
+    <p class="lede">
+      The entire palette derives from one hue, so moving a single slider
+      re-colours every page. Lightness stays fixed as you go, which is what
+      keeps text readable at any setting rather than breaking on one unlucky
+      pairing.
+    </p>
+  </header>
+
+  <section class="band">
+    <div class="shell split">
+
+      <div>
+        <h2 class="section-head">Colour and type</h2>
+        <div class="controls">
+
+          <div class="control">
+            <div class="control-top">
+              <label for="hue">Brand hue</label>
+              <output id="hueOut" for="hue"></output>
+            </div>
+            <input type="range" id="hue" min="0" max="360" step="1" value="158">
+            <p class="hint">Drives headings, links, the card tint and the rules.</p>
+          </div>
+
+          <div class="control">
+            <div class="control-top">
+              <label for="chroma">Colour intensity</label>
+              <output id="chromaOut" for="chroma"></output>
+            </div>
+            <input type="range" id="chroma" min="0" max="0.14" step="0.005" value="0.06">
+            <p class="hint">Zero is a near-grey. The default is deliberately quiet.</p>
+          </div>
+
+          <div class="control">
+            <div class="control-top">
+              <label for="accentHue">Accent hue</label>
+              <output id="accentOut" for="accentHue"></output>
+            </div>
+            <input type="range" id="accentHue" min="0" max="360" step="1" value="48">
+            <p class="hint">Focus outlines and hover states only — it is meant to
+               sit against the brand hue, not match it.</p>
+          </div>
+
+          <div class="control">
+            <div class="control-top">
+              <label for="font">Typeface</label>
+            </div>
+            <select id="font"></select>
+            <p class="hint">Loaded from Google Fonts as you pick it. "System" loads
+               nothing at all and is the fastest.</p>
+          </div>
+
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn" id="copy">Copy the CSS</button>
+          <button type="button" class="btn btn-quiet" id="reset">Reset to default</button>
+          <span class="said" id="said" role="status" aria-live="polite"></span>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="section-head">Preview</h2>
+        <div class="preview">
+          <div class="phi" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div class="pv-card lead">
+            <span class="pv-tag">Interactive walkthrough</span>
+            <h3>Route driver application</h3>
+            <p>A compost hauler ran its routes off a printed spreadsheet. I built
+               a progressive web app that reads that same sheet live.</p>
+            <span class="pv-cta">Three live demos &rarr;</span>
+          </div>
+          <div class="pv-card">
+            <span class="pv-tag">Design tool</span>
+            <h3>Golden Section Palette</h3>
+            <p>Pick a colour and watch the golden rectangle build itself, then the
+               spiral tracing over the top.</p>
+            <span class="pv-cta">Build a palette &rarr;</span>
+          </div>
+          <div class="pv-row">
+            <h3>Early Music San Antonio</h3>
+            <span class="where">Nonprofit</span>
+            <p>Season calendar, concert pages and ticketing for a volunteer-run
+               arts nonprofit.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="shell">
+    <h2 class="section-head">Making it permanent</h2>
+    <div class="note">
+      What you set here is saved in <strong>this browser only</strong>. Every page
+      of the site will wear it on this machine, and nobody else sees any of it.
+      That is deliberate — it means you can try things on the live site without
+      publishing a half-finished idea.
+    </div>
+    <div class="note">
+      To make a setting real for visitors, press <strong>Copy the CSS</strong> and
+      paste the block over the matching lines in the <code>:root</code> of
+      <code>index.html</code>, <code>work/evergreen/index.html</code> and
+      <code>settings.html</code> — then commit. Those three pages each hold their
+      own copy of the tokens on purpose, so each stands alone as one file.
+    </div>
+    <pre class="out" id="out" aria-label="CSS for the current settings"></pre>
+  </section>
+
+</main>
+
+<footer class="shell">
+  <span>&copy; <span id="y">2026</span> Virginia P. Payson &middot; Basalt, Colorado</span>
+  <span><a href="/">All work</a> &middot; <a href="palette/">Color tools</a></span>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+
+  var KEY = 'vp_theme';
+  var GF = 'https://fonts.googleapis.com/css2?family=';
+
+  // Every option is a real family on Google Fonts, except System which loads
+  // nothing. Keep stack and href together so saving one saves both.
+  var FONTS = [
+    { id:'gsf', name:'Google Sans Flex (default)',
+      href: GF + 'Google+Sans+Flex:opsz,wght@6..144,100..1000&display=swap',
+      stack:'"Google Sans Flex", "Google Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' },
+    { id:'inter', name:'Inter — neutral sans',
+      href: GF + 'Inter:opsz,wght@14..32,100..900&display=swap',
+      stack:'"Inter", ui-sans-serif, system-ui, sans-serif' },
+    { id:'work', name:'Work Sans — warmer sans',
+      href: GF + 'Work+Sans:wght@200..900&display=swap',
+      stack:'"Work Sans", ui-sans-serif, system-ui, sans-serif' },
+    { id:'source', name:'Source Serif 4 — editorial serif',
+      href: GF + 'Source+Serif+4:opsz,wght@8..60,200..900&display=swap',
+      stack:'"Source Serif 4", Georgia, "Times New Roman", serif' },
+    { id:'fraunces', name:'Fraunces — soft display serif',
+      href: GF + 'Fraunces:opsz,wght@9..144,100..900&display=swap',
+      stack:'"Fraunces", Georgia, "Times New Roman", serif' },
+    { id:'system', name:'System — loads nothing',
+      href:'',
+      stack:'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }
+  ];
+
+  var DEFAULTS = { hue:158, chroma:0.06, accentHue:48, font:'gsf' };
+
+  var root  = document.documentElement;
+  var elHue = document.getElementById('hue');
+  var elChr = document.getElementById('chroma');
+  var elAcc = document.getElementById('accentHue');
+  var elFont= document.getElementById('font');
+  var out   = document.getElementById('out');
+  var said  = document.getElementById('said');
+
+  FONTS.forEach(function(f){
+    var o = document.createElement('option');
+    o.value = f.id; o.textContent = f.name;
+    elFont.appendChild(o);
+  });
+
+  function fontById(id){
+    for (var i = 0; i < FONTS.length; i++) if (FONTS[i].id === id) return FONTS[i];
+    return FONTS[0];
+  }
+
+  function read(){
+    try { return JSON.parse(localStorage.getItem(KEY) || '{}'); }
+    catch (e) { return {}; }
+  }
+
+  var state = (function(){
+    var s = read();
+    return {
+      hue:       s.hue       != null ? +s.hue       : DEFAULTS.hue,
+      chroma:    s.chroma    != null ? +s.chroma    : DEFAULTS.chroma,
+      accentHue: s.accentHue != null ? +s.accentHue : DEFAULTS.accentHue,
+      font:      s.font      || DEFAULTS.font
+    };
+  })();
+
+  // One <link> reused for whichever family is selected, so switching fonts
+  // does not pile up stylesheets in the head.
+  var fontLink = null;
+  function loadFont(f){
+    if (!f.href){ if (fontLink) fontLink.href = 'data:text/css,'; return; }
+    if (!fontLink){
+      fontLink = document.createElement('link');
+      fontLink.rel = 'stylesheet';
+      document.head.appendChild(fontLink);
+    }
+    if (fontLink.href !== f.href) fontLink.href = f.href;
+  }
+
+  function apply(){
+    var f = fontById(state.font);
+    root.style.setProperty('--hue', state.hue);
+    root.style.setProperty('--chroma', state.chroma);
+    root.style.setProperty('--accent-hue', state.accentHue);
+    root.style.setProperty('--font', f.stack);
+    loadFont(f);
+
+    document.getElementById('hueOut').textContent    = state.hue;
+    document.getElementById('chromaOut').textContent = state.chroma.toFixed(3);
+    document.getElementById('accentOut').textContent = state.accentHue;
+
+    out.textContent =
+      ':root{\n' +
+      '  --hue: ' + state.hue + ';\n' +
+      '  --chroma: ' + state.chroma + ';\n' +
+      '  --accent-hue: ' + state.accentHue + ';\n' +
+      '  --font: ' + f.stack + ';\n' +
+      '}' +
+      (f.href ? '\n\n/* and in <head>, replacing the current font link: */\n' +
+                '<link href="' + f.href + '" rel="stylesheet">' : '');
+  }
+
+  function save(){
+    var f = fontById(state.font);
+    try {
+      localStorage.setItem(KEY, JSON.stringify({
+        hue: state.hue, chroma: state.chroma, accentHue: state.accentHue,
+        font: state.font, fontStack: f.stack, fontHref: f.href
+      }));
+    } catch (e) {
+      say('Could not save — this browser is blocking storage.');
+    }
+  }
+
+  var sayTimer;
+  function say(msg){
+    said.textContent = msg;
+    clearTimeout(sayTimer);
+    sayTimer = setTimeout(function(){ said.textContent = ''; }, 3200);
+  }
+
+  elHue.value  = state.hue;
+  elChr.value  = state.chroma;
+  elAcc.value  = state.accentHue;
+  elFont.value = state.font;
+  apply();
+
+  elHue.addEventListener('input',  function(){ state.hue       = +this.value; apply(); save(); });
+  elChr.addEventListener('input',  function(){ state.chroma    = +this.value; apply(); save(); });
+  elAcc.addEventListener('input',  function(){ state.accentHue = +this.value; apply(); save(); });
+  elFont.addEventListener('change',function(){ state.font      =  this.value; apply(); save(); });
+
+  document.getElementById('reset').addEventListener('click', function(){
+    state.hue = DEFAULTS.hue; state.chroma = DEFAULTS.chroma;
+    state.accentHue = DEFAULTS.accentHue; state.font = DEFAULTS.font;
+    elHue.value = state.hue; elChr.value = state.chroma;
+    elAcc.value = state.accentHue; elFont.value = state.font;
+    apply();
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    say('Back to the default.');
+  });
+
+  document.getElementById('copy').addEventListener('click', function(){
+    var text = out.textContent;
+    function fallback(){
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed'; ta.style.top = '-1000px';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); say('Copied.'); }
+      catch (e) { say('Select the block below and copy it.'); }
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ say('Copied.'); }, fallback);
+    } else {
+      fallback();
+    }
+  });
+
+  document.getElementById('y').textContent = new Date().getFullYear();
+})();
+</script>
+</body>
+</html>

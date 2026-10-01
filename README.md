@@ -5,6 +5,7 @@ dependencies, no framework. Auto-deploys to Render on every push to `main`.
 
 ```
 index.html                       home — Applications, then Selected work
+settings.html                    re-tone the site: hue, chroma, accent, typeface
 palette/                         Color Theory Wheel + Golden Section Palette
 work/evergreen/index.html        route driver app — case study
 work/evergreen/walkthrough.html  the interactive demo
@@ -25,6 +26,13 @@ Every customer, address, note and gate code in it is invented, and the intro
 says so. The original used real streets and named real Carbondale developments,
 which was fine internally and wrong for a public page — if you ever re-copy the
 file from the app, redo that sanitisation.
+
+The same applies to `work/evergreen/img/`. Those three screenshots show demo
+data, but they were captured with the client's wordmark in the app's top bar,
+so the bar is **cropped off** (86px from the two board shots, 79px from the
+phone). Uncropped originals are in git history. If you re-shoot them, crop
+again — or stop cropping once the client is named publicly, which is the open
+item below.
 
 ## Open items
 
@@ -86,6 +94,21 @@ Everything visual is a CSS custom property in the `:root` block at the top of
 Light and dark palettes are both defined; dark follows the visitor's OS setting.
 
 Content is plain semantic HTML below the `<style>` block — edit the text directly.
+
+### `/settings.html`
+
+Sliders for brand hue, colour intensity and accent hue, plus a typeface picker,
+previewing live against real components. It writes a `vp_theme` key to
+`localStorage`, and a short applier in the `<head>` of each page reads it before
+paint — so a setting follows you around the site **in your browser only**.
+Nothing a visitor sees changes until you press **Copy the CSS** and paste the
+block into the `:root` of each page.
+
+Adding a page means copying two things into its `<head>`: the token block, and
+that applier script. Miss the applier and the new page ignores your settings;
+miss the font link and it silently falls back to system-ui — which is exactly
+what the whole site was doing until 2026-10-01, because `--font` named Google
+Sans Flex but no page ever loaded it.
 
 `work/evergreen/index.html` repeats the same `:root` token block on purpose, so
 each page stands alone as one file. If the hue changes, change it in both.

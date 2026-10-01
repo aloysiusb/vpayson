@@ -26,6 +26,13 @@ says so. The original used real streets and named real Carbondale developments,
 which was fine internally and wrong for a public page — if you ever re-copy the
 file from the app, redo that sanitisation.
 
+The same applies to `work/evergreen/img/`. Those three screenshots show demo
+data, but they were captured with the client's wordmark in the app's top bar,
+so the bar is **cropped off** (86px from the two board shots, 79px from the
+phone). Uncropped originals are in git history. If you re-shoot them, crop
+again — or stop cropping once the client is named publicly, which is the open
+item below.
+
 ## Open items
 
 - [ ] **Name the client in the case study.** It currently says "a compost and

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Route driver application — Virginia P. Payson</title>
-<meta name="description" content="A progressive web app that put a compost hauler's routes on drivers' phones, synced live against the spreadsheet the office already used. Node, Express, WebSockets, Google Sheets. Interactive walkthrough with sample data.">
+<meta name="description" content="A progressive web app that put a compost hauler's routes on drivers' phones, synced live against the spreadsheet the office already used. Offline-tolerant, access-gated, with a dispatcher board and a customer portal. Node, Express, WebSockets, Google Sheets. Interactive walkthrough with sample data.">
 <link rel="canonical" href="https://vpayson.com/work/evergreen/">
 <meta property="og:title" content="Route driver application — built for a Roaring Fork Valley compost hauler">
 <meta property="og:description" content="Live route sync to drivers' phones, turn-by-turn navigation, notes and photos back to the office. Try the interactive walkthrough.">
@@ -133,6 +133,23 @@ section{padding-block:clamp(2.5rem,6vh,4rem)}
 }
 .note code{font-family:var(--mono); font-size:.92em; color:var(--ink)}
 
+/* Screenshots. The caption carries the explanation, so alt text is free to
+   describe the picture rather than argue for it. */
+.shot{margin:0; display:grid; gap:.85rem; justify-items:start}
+.shot img{
+  display:block; width:100%; height:auto;
+  border:1px solid var(--rule); border-radius:12px; background:var(--paper-alt);
+}
+.shot figcaption{font-size:var(--step--1); color:var(--ink-faint); max-width:var(--measure)}
+/* The phone shot is 780px wide and tall — let it stay phone-sized rather than
+   stretching across a desktop column. */
+.shot-phone img{max-width:17.5rem}
+.shot-pair{display:grid; gap:2.25rem; align-items:start}
+/* A pairs grid that follows an intro paragraph rather than a heading. */
+.pairs-led{margin-block-start:2rem}
+.shot-wide{margin-block-start:2.5rem}
+@media (min-width:48rem){ .shot-pair{grid-template-columns:17.5rem 1fr; gap:2.75rem} }
+
 footer{
   padding-block:2.25rem 3rem; border-block-start:1px solid var(--rule);
   font-size:var(--step--1); color:var(--ink-faint);
@@ -167,8 +184,10 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
       <a class="btn" href="dispatch.html">The office board &rarr;</a>
       <a class="btn btn-quiet" href="walkthrough.html?view=map">Route map &rarr;</a>
     </div>
-    <p class="btn-note btn-note-wide">All three run in your browser on invented
-       data — no server, no route sheet, no sign-in, and no customer who exists.</p>
+    <p class="btn-note btn-note-wide">The first is a scripted movie of a driver's
+       morning; the other two you drive yourself. All three run in your browser on
+       invented data — no server, no route sheet, no sign-in, and no customer who
+       exists.</p>
   </header>
 
   <div class="band">
@@ -191,6 +210,39 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
       </div>
     </dl>
   </div>
+
+  <section class="shell">
+    <h2 class="section-head">The driver's screen</h2>
+    <div class="shot-pair">
+      <figure class="shot shot-phone">
+        <img src="img/stops-phone.jpg" width="780" height="1521" loading="lazy" decoding="async"
+             alt="A stop on a phone: the customer name and address, a large green tick to
+                  mark it done, seven round report buttons — contamination, overflow, both,
+                  bear, locked, skipped, photo — and the driver's note underneath.">
+        <figcaption>
+          One stop, as a driver sees it. The tick is the whole interaction most of the
+          time; the round buttons file the things that actually happen on a route, in
+          one tap each, with a glove on. The note beneath it is the gate code and what
+          was wrong with the bin — written in the cab, read in the office.
+        </figcaption>
+      </figure>
+      <div class="prose">
+        <p>
+          Everything on this screen is sized for somebody standing at the back of a
+          truck in winter. One column, one thumb, no menus to go hunting in, and the
+          next stop always directly below the one just finished.
+        </p>
+        <p>
+          The seven report buttons replaced a free-text box. Drivers were already
+          noting contamination and overflow; typing it on a phone, in the cold, meant
+          it often did not get noted at all. A tap files the same thing, consistently
+          enough that the office can count it.
+        </p>
+        <p class="btn-note">Screenshots are from the demo data — no real customer
+           appears in them.</p>
+      </div>
+    </div>
+  </section>
 
   <section class="shell">
     <h2 class="section-head">The problem</h2>
@@ -264,6 +316,65 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
   </section>
 
   <section class="shell">
+    <h2 class="section-head">What it grew into</h2>
+    <div class="prose">
+      <p>
+        The first version marked stops done. Most of what follows arrived after
+        drivers had used it for a while and told me where it hurt — which is the
+        only order I have ever seen produce software anybody keeps.
+      </p>
+    </div>
+    <div class="pairs pairs-led">
+      <div class="pair">
+        <h3>It keeps working with no signal</h3>
+        <p>Dead zones are a fact about this valley, not an edge case. A failed
+           write is never rolled back on screen — it parks in local storage and
+           retries on reconnect, on refocus, and on a timer. Every queued write
+           is the absolute state of a stop rather than a change to it, which is
+           what makes a blind retry safe to repeat.</p>
+      </div>
+      <div class="pair">
+        <h3>Behind a code</h3>
+        <p>The route sheet holds customer names, addresses and gate codes. A
+           shared access code now sits in front of every route and every file,
+           taken from a one-time link and kept in a cookie — then stripped from
+           the address bar, so it is not left behind in a screenshot.</p>
+      </div>
+      <div class="pair">
+        <h3>Mapping that does not run up a bill</h3>
+        <p>Map APIs charge per call, and the expensive ones are the ones inside
+           something that repeats. Addresses are geocoded once, ever, and cached.
+           Directions and traffic are throttled by both time elapsed and distance
+           moved. The reroute watcher sleeps while the tab is hidden, so a phone
+           left in a cab overnight costs nothing.</p>
+      </div>
+      <div class="pair">
+        <h3>A customer portal, and a way to pay</h3>
+        <p>Customers request a hold or an extra pickup themselves, and those
+           requests queue for a human rather than landing in a route. Invoices
+           are raised against QuickBooks, so payment links come from the books
+           the business already keeps.</p>
+      </div>
+      <div class="pair">
+        <h3>Test-drive it from a desk</h3>
+        <p>A simulation mode drives the real driver screen with synthetic GPS
+           walking a real route, and a fake network with an on and off switch —
+           which is how the offline queue gets exercised without finding a dead
+           zone. It wraps the actual pages rather than reimplementing them, so it
+           cannot drift out of step with what drivers run. Writes never reach the
+           sheet.</p>
+      </div>
+      <div class="pair">
+        <h3>It reports its own failures</h3>
+        <p>Drivers do not file bug reports; they work around things and say
+           nothing. The app posts what breaks on its own, deduplicated so one
+           fault firing every second is one line with a count — including the
+           quiet kind, where nothing throws and a response simply came back wrong.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="shell">
     <h2 class="section-head">The office board</h2>
     <div class="prose">
       <p>
@@ -285,6 +396,21 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
            watch the feed move.</p>
       </div>
     </div>
+    <figure class="shot shot-wide">
+      <picture>
+        <source srcset="img/board-dark.jpg" media="(prefers-color-scheme: dark)">
+        <img src="img/board-light.jpg" width="2320" height="1874" loading="lazy" decoding="async"
+             alt="The dispatcher board: a running feed of stops marked done, notes and
+                  incident reports in ruled rows, above a grid of route cards each showing
+                  stops completed, a progress bar, the current stop and what was reported.">
+      </picture>
+      <figcaption>
+        The board the office watches. The feed down the top is the morning as it
+        happens, newest first; the cards below are one per route, each with its
+        progress and whatever the driver has flagged. It follows the visitor's
+        light or dark setting, as the real one does.
+      </figcaption>
+    </figure>
   </section>
 
   <section class="shell">

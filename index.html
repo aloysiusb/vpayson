@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Virginia P. Payson — Web Design &amp; Development, Basalt &amp; Roaring Fork Valley, Colorado</title>
 <meta name="description" content="Independent application and web development in Basalt, Colorado. Live apps you can open and use, plus fast, accessible, maintainable websites for mountain-town businesses, nonprofits and destinations. Building in the Roaring Fork Valley since 2002.">
-<link rel="canonical" href="https://vpayson.onrender.com/">
+<link rel="canonical" href="https://vpayson.com/">
 <meta property="og:title" content="Virginia P. Payson — Websites and applications, designed and built">
 <meta property="og:description" content="Independent application and web development in Basalt, Colorado. Building in the Roaring Fork Valley since 2002.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://vpayson.onrender.com/">
+<meta property="og:url" content="https://vpayson.com/">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%231f5c47'/><text y='.72em' x='50%25' text-anchor='middle' font-size='62' font-family='system-ui' fill='%23fff'>V</text></svg>">
 
 <style>
@@ -150,6 +150,18 @@ section{padding-block:clamp(2.75rem,7vh,4.5rem)}
 .item p{grid-column:1 / -1; color:var(--ink-soft); font-size:var(--step--1); max-width:52ch; margin-block-start:.3rem}
 .item .go{color:var(--brand); font-weight:600}
 
+/* A work entry with more than one destination. The row itself is not a link,
+   so it must not light up like one — the links below carry the affordance. */
+.item-multi:hover,.item-multi:focus-within{background:none; padding-inline:0}
+.item-links{
+  grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:.35rem 1.25rem;
+  margin-block-start:.7rem; font-size:var(--step--1); font-weight:600;
+}
+.item-links a{
+  color:var(--brand); text-decoration-thickness:1px; text-underline-offset:.22em;
+}
+.item-links a:hover,.item-links a:focus-visible{color:var(--accent)}
+
 /* Confidential work: described, never linked. No hover affordance, because
    there is nothing to click and pretending otherwise would be annoying. */
 
@@ -222,10 +234,14 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
         <p>A compost hauler ran its routes off a printed spreadsheet. I built a
            progressive web app that reads that same sheet live — drivers work
            from their phones, the office watches progress arrive, and nobody had
-           to learn a new system. Turn-by-turn navigation, notes and photos back
-           from the cab, an approval queue for customer requests, and a server
-           that physically cannot show a driver the billing columns.</p>
-        <span class="stack">Node &middot; Express &middot; WebSockets &middot; Google Sheets API &middot; vanilla JS &middot; in daily use</span>
+           to learn a new system. Turn-by-turn navigation in the app, notes and
+           photos back from the cab, and a server that physically cannot show a
+           driver the billing columns.</p>
+        <p>It has kept growing since: work continues through the valley's dead
+           zones and syncs when signal returns, customers request holds through a
+           portal and pay from the books the office already keeps, and the mapping
+           calls are cached and guarded so the bill stays flat.</p>
+        <span class="stack">Node &middot; Express &middot; WebSockets &middot; Google Sheets API &middot; QuickBooks &middot; vanilla JS &middot; in daily use</span>
         <span class="cta">Three live demos — driver's phone, route map, office board &rarr;</span>
       </a>
 
@@ -257,15 +273,18 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
         <span class="cta">Change the colours &rarr;</span>
       </a>
 
-      <a class="app" href="https://cymatic-decoder.onrender.com/">
-        <span class="tag">Experiment</span>
+      <a class="app" href="https://cymatic-decoder.onrender.com/static/resonance-engine.html">
+        <span class="tag">Sound</span>
         <h3>Resonance Engine</h3>
-        <p>Musical, brainwave, colour and cymatic frequencies mapped against each
-           other in one interface, with additive synthesis through the Web Audio
-           API and a live canvas visualisation. Built because I wanted to see
-           whether the correspondences held up.</p>
-        <span class="stack">Web Audio API &middot; canvas &middot; Python backend</span>
-        <span class="cta">Open it &rarr;</span>
+        <p>Play a frequency and watch it take shape. Tones are tuned to A432 and
+           drawn as water cymatics in WebGL, the surface tinted by that tone's own
+           colour octave. The harp voice is a plucked string modelled note by note
+           rather than a sample, so it rings and decays like the real thing. Every
+           pitch is mapped against its musical note, brainwave band and colour —
+           and it runs backwards too: give it a photo of a Chladni pattern and it
+           returns the frequencies that would produce it.</p>
+        <span class="stack">Web Audio API &middot; WebGL &middot; Karplus&ndash;Strong synthesis &middot; Python / FastAPI backend</span>
+        <span class="cta">Play it &rarr;</span>
       </a>
 
     </div>
@@ -285,15 +304,22 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
         </a>
 
         <!-- Render, not carolynnheilinteriors.com: the old /CH-index path no longer
-             exists (it was promoted to the homepage), and this URL is verified live.
-             Swap to the custom domain once it points here. -->
-        <a class="item" href="https://carolynn-heil.onrender.com/project-aspen-residence.html">
+             exists (it was promoted to the homepage), and these paths are checked
+             against the deployed site. Swap the host once the custom domain points
+             here — the four paths stay the same. -->
+        <div class="item item-multi">
           <h3>Carolynn Heil Interiors</h3>
-          <span class="where">Aspen &middot; <span class="go">See a project &rarr;</span></span>
-          <p>Vanilla HTML, CSS and JavaScript on golden-ratio proportions and an OKLCH
-             color system. Opens on the Aspen Residence case study — full gallery and
-             project detail; the rest of the site is in the header from there.</p>
-        </a>
+          <span class="where">Aspen</span>
+          <p>A complete studio site in vanilla HTML, CSS and JavaScript, laid out on
+             golden-ratio proportions with an OKLCH colour system — and a control
+             panel built into it so the studio can re-tone the whole site itself.</p>
+          <div class="item-links">
+            <a href="https://carolynn-heil.onrender.com/">Home &rarr;</a>
+            <a href="https://carolynn-heil.onrender.com/work.html">Work &rarr;</a>
+            <a href="https://carolynn-heil.onrender.com/project-aspen-residence.html">Hallam Residence &rarr;</a>
+            <a href="https://carolynn-heil.onrender.com/settings.html">Style control panel &rarr;</a>
+          </div>
+        </div>
 
         <a class="item" href="https://earlymusicsa.org/">
           <h3>Early Music San Antonio</h3>

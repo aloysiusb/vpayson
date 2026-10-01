@@ -97,18 +97,38 @@ Content is plain semantic HTML below the `<style>` block — edit the text direc
 
 ### `/settings.html`
 
-Sliders for brand hue, colour intensity and accent hue, plus a typeface picker,
-previewing live against real components. It writes a `vp_theme` key to
-`localStorage`, and a short applier in the `<head>` of each page reads it before
-paint — so a setting follows you around the site **in your browser only**.
-Nothing a visitor sees changes until you press **Copy the CSS** and paste the
-block into the `:root` of each page.
+Eleven controls in three groups — **Colour** (brand hue, intensity, accent
+hue), **Type** (typeface, display/heading/body/label weight, display tracking,
+type scale) and **Layout** (corner radius, content width) — previewing live
+against real components. It writes a `vp_theme` key to `localStorage`, and a
+short applier in the `<head>` of each page reads it before paint, so a setting
+follows you around the site **in your browser only**. Nothing a visitor sees
+changes until you press **Copy the CSS** and paste the block into the `:root`
+of each page.
 
-Adding a page means copying two things into its `<head>`: the token block, and
-that applier script. Miss the applier and the new page ignores your settings;
-miss the font link and it silently falls back to system-ui — which is exactly
-what the whole site was doing until 2026-10-01, because `--font` named Google
-Sans Flex but no page ever loaded it.
+**Adding a control takes one line.** The `SPEC` array near the top of the
+script drives the sliders, the preview and the exported CSS together, and the
+saved value is a flat `{vars: {'--token': value}}` map that every page applies
+blind. So a new token needs a row in `SPEC` and a default in each page's
+`:root` — no other file changes. (An older save that named each token
+individually is still honoured, and is applied first so the current format
+wins.)
+
+Adding a *page* means copying two things into its `<head>`: the token block,
+and that applier script. Miss the applier and the new page ignores your
+settings; miss the font link and it silently falls back to system-ui — which
+is exactly what the whole site was doing until 2026-10-01, because `--font`
+named Google Sans Flex but no page ever loaded it.
+
+### Type
+
+Google Sans Flex is variable (`wght` 100–1000), so the site treats weight as a
+dial rather than a choice between four static files. The masthead runs light
+and large (`--w-display: 300`) and the small uppercase labels run heavy
+(`--w-label: 700`); the distance between those two is what carries the
+hierarchy, instead of making everything bold. Optical sizing is left on the
+browser's default `auto` — don't pin `opsz` through `font-variation-settings`,
+because naming an axis there overrides the matching CSS property.
 
 `work/evergreen/index.html` repeats the same `:root` token block on purpose, so
 each page stands alone as one file. If the hue changes, change it in both.

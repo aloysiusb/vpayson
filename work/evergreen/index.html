@@ -21,10 +21,14 @@
 (function(){
   try{
     var t = JSON.parse(localStorage.getItem('vp_theme') || '{}'), r = document.documentElement;
+    /* Older saves named each token. Applied first so the current format wins. */
     if(t.hue != null)       r.style.setProperty('--hue', t.hue);
     if(t.chroma != null)    r.style.setProperty('--chroma', t.chroma);
     if(t.accentHue != null) r.style.setProperty('--accent-hue', t.accentHue);
     if(t.fontStack)         r.style.setProperty('--font', t.fontStack);
+    /* Current format: a flat map of custom property -> value, so adding a
+       control to /settings.html needs no change to any other page. */
+    if(t.vars) for(var k in t.vars) r.style.setProperty(k, t.vars[k]);
     if(t.fontHref){
       var l = document.createElement('link');
       l.rel = 'stylesheet'; l.href = t.fontHref;
@@ -54,12 +58,25 @@
   --measure: 34rem;
   --gutter: clamp(1.25rem, 5vw, 4rem);
   --shell: 62rem;
+  --radius: 14px;
 
-  --step--1: clamp(.82rem, .79rem + .14vw, .89rem);
-  --step-0:  clamp(1rem, .96rem + .2vw, 1.09rem);
-  --step-1:  clamp(1.2rem, 1.12rem + .4vw, 1.45rem);
-  --step-2:  clamp(1.55rem, 1.36rem + .95vw, 2.15rem);
-  --step-3:  clamp(2.1rem, 1.6rem + 2.5vw, 3.6rem);
+  /* Type. Google Sans Flex is a variable font (wght 100–1000), so weight is a
+     dial here rather than a choice between four static files. The masthead
+     runs light and large, the small uppercase labels run heavy, and the gap
+     between them does the work that bold type usually does. Every value below
+     is adjustable from /settings.html without touching this file. */
+  --scale: 1;
+  --w-display: 300;
+  --w-heading: 500;
+  --w-body:    380;
+  --w-label:   700;
+  --track-display: -.04em;
+
+  --step--1: calc(clamp(.82rem, .79rem + .14vw, .89rem) * var(--scale));
+  --step-0:  calc(clamp(1rem, .96rem + .2vw, 1.09rem) * var(--scale));
+  --step-1:  calc(clamp(1.2rem, 1.12rem + .4vw, 1.45rem) * var(--scale));
+  --step-2:  calc(clamp(1.55rem, 1.36rem + .95vw, 2.15rem) * var(--scale));
+  --step-3:  calc(clamp(2.3rem, 1.7rem + 2.9vw, 4.2rem) * var(--scale));
 
   --font: "Google Sans Flex", "Google Sans", ui-sans-serif, system-ui,
           -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -85,9 +102,10 @@ html{-webkit-text-size-adjust:100%}
 body{
   margin:0; background:var(--paper); color:var(--ink);
   font-family:var(--font); font-size:var(--step-0); line-height:1.6;
+  font-weight:var(--w-body);
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
 }
-h1,h2,h3{line-height:1.14; margin:0; font-weight:600; letter-spacing:-.02em; text-wrap:balance}
+h1,h2,h3{line-height:1.14; margin:0; font-weight:var(--w-heading); letter-spacing:-.02em; text-wrap:balance}
 p{margin:0; text-wrap:pretty}
 a{color:inherit}
 :focus-visible{outline:2.5px solid var(--accent); outline-offset:3px; border-radius:2px}
@@ -101,10 +119,13 @@ a{color:inherit}
 /* Hero */
 .hero{padding-block:clamp(1.5rem,5vh,3rem) clamp(2rem,6vh,3.5rem)}
 .eyebrow{
-  font-size:var(--step--1); font-weight:600; letter-spacing:.12em;
+  font-size:var(--step--1); font-weight:var(--w-label); letter-spacing:.12em;
   text-transform:uppercase; color:var(--brand); margin:0 0 1.2rem;
 }
-.hero h1{font-size:var(--step-3); max-width:22ch}
+.hero h1{
+  font-size:var(--step-3); max-width:22ch;
+  font-weight:var(--w-display); letter-spacing:var(--track-display);
+}
 .lede{font-size:var(--step-1); color:var(--ink-soft); max-width:var(--measure); margin-block-start:1.5rem}
 
 /* The call to action, which is the point of the page */
@@ -136,7 +157,7 @@ a{color:inherit}
 section{padding-block:clamp(2.5rem,6vh,4rem)}
 .band{background:var(--paper-alt); border-block:1px solid var(--rule)}
 .section-head{
-  font-size:var(--step--1); font-weight:600; letter-spacing:.12em;
+  font-size:var(--step--1); font-weight:var(--w-label); letter-spacing:.12em;
   text-transform:uppercase; color:var(--ink-faint); margin:0 0 1.75rem;
 }
 .prose{max-width:var(--measure); display:grid; gap:1.1rem}
@@ -162,7 +183,7 @@ section{padding-block:clamp(2.5rem,6vh,4rem)}
 .shot{margin:0; display:grid; gap:.85rem; justify-items:start}
 .shot img{
   display:block; width:100%; height:auto;
-  border:1px solid var(--rule); border-radius:12px; background:var(--paper-alt);
+  border:1px solid var(--rule); border-radius:var(--radius); background:var(--paper-alt);
 }
 .shot figcaption{font-size:var(--step--1); color:var(--ink-faint); max-width:var(--measure)}
 /* The phone shot is 780px wide and tall — let it stay phone-sized rather than

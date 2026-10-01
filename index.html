@@ -22,10 +22,14 @@
 (function(){
   try{
     var t = JSON.parse(localStorage.getItem('vp_theme') || '{}'), r = document.documentElement;
+    /* Older saves named each token. Applied first so the current format wins. */
     if(t.hue != null)       r.style.setProperty('--hue', t.hue);
     if(t.chroma != null)    r.style.setProperty('--chroma', t.chroma);
     if(t.accentHue != null) r.style.setProperty('--accent-hue', t.accentHue);
     if(t.fontStack)         r.style.setProperty('--font', t.fontStack);
+    /* Current format: a flat map of custom property -> value, so adding a
+       control to /settings.html needs no change to any other page. */
+    if(t.vars) for(var k in t.vars) r.style.setProperty(k, t.vars[k]);
     if(t.fontHref){
       var l = document.createElement('link');
       l.rel = 'stylesheet'; l.href = t.fontHref;
@@ -58,12 +62,25 @@
   --measure: 34rem;
   --gutter: clamp(1.25rem, 5vw, 4rem);
   --shell: 62rem;
+  --radius: 14px;
 
-  --step--1: clamp(.82rem, .79rem + .14vw, .89rem);
-  --step-0:  clamp(1rem, .96rem + .2vw, 1.09rem);
-  --step-1:  clamp(1.2rem, 1.12rem + .4vw, 1.45rem);
-  --step-2:  clamp(1.55rem, 1.36rem + .95vw, 2.15rem);
-  --step-3:  clamp(2.1rem, 1.6rem + 2.5vw, 3.6rem);
+  /* Type. Google Sans Flex is a variable font (wght 100–1000), so weight is a
+     dial here rather than a choice between four static files. The masthead
+     runs light and large, the small uppercase labels run heavy, and the gap
+     between them does the work that bold type usually does. Every value below
+     is adjustable from /settings.html without touching this file. */
+  --scale: 1;
+  --w-display: 300;
+  --w-heading: 500;
+  --w-body:    380;
+  --w-label:   700;
+  --track-display: -.04em;
+
+  --step--1: calc(clamp(.82rem, .79rem + .14vw, .89rem) * var(--scale));
+  --step-0:  calc(clamp(1rem, .96rem + .2vw, 1.09rem) * var(--scale));
+  --step-1:  calc(clamp(1.2rem, 1.12rem + .4vw, 1.45rem) * var(--scale));
+  --step-2:  calc(clamp(1.55rem, 1.36rem + .95vw, 2.15rem) * var(--scale));
+  --step-3:  calc(clamp(2.3rem, 1.7rem + 2.9vw, 4.2rem) * var(--scale));
 
   --font: "Google Sans Flex", "Google Sans", ui-sans-serif, system-ui,
           -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -89,9 +106,10 @@ html{-webkit-text-size-adjust:100%}
 body{
   margin:0; background:var(--paper); color:var(--ink);
   font-family:var(--font); font-size:var(--step-0); line-height:1.6;
+  font-weight:var(--w-body);
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
 }
-h1,h2,h3{line-height:1.12; margin:0; font-weight:600; letter-spacing:-.02em; text-wrap:balance}
+h1,h2,h3{line-height:1.12; margin:0; font-weight:var(--w-heading); letter-spacing:-.02em; text-wrap:balance}
 p{margin:0; text-wrap:pretty}
 a{color:inherit}
 :focus-visible{outline:2.5px solid var(--accent); outline-offset:3px; border-radius:2px}
@@ -101,11 +119,17 @@ a{color:inherit}
 /* ──────────────────────────────  HERO  ────────────────────────── */
 .hero{padding-block:clamp(4rem,14vh,8.5rem) clamp(3rem,9vh,5.5rem)}
 .eyebrow{
-  font-size:var(--step--1); font-weight:600; letter-spacing:.12em;
+  font-size:var(--step--1); font-weight:var(--w-label); letter-spacing:.12em;
   text-transform:uppercase; color:var(--brand); margin:0 0 1.4rem;
 }
-.hero h1{font-size:var(--step-3); max-width:16ch}
-.hero h1 .quiet{color:var(--ink-faint); font-weight:400; display:block; letter-spacing:-.015em}
+.hero h1{
+  font-size:var(--step-3); max-width:16ch;
+  font-weight:var(--w-display); letter-spacing:var(--track-display);
+}
+.hero h1 .quiet{
+  color:var(--ink-faint); display:block;
+  font-weight:var(--w-display); letter-spacing:var(--track-display);
+}
 .lede{font-size:var(--step-1); color:var(--ink-soft); max-width:var(--measure); margin-block-start:1.6rem}
 .hero-meta{
   display:flex; flex-wrap:wrap; gap:.5rem 1.6rem; margin-block-start:2.2rem;
@@ -126,7 +150,7 @@ a{color:inherit}
 section{padding-block:clamp(2.75rem,7vh,4.5rem)}
 .band{background:var(--paper-alt); border-block:1px solid var(--rule)}
 .section-head{
-  font-size:var(--step--1); font-weight:600; letter-spacing:.12em;
+  font-size:var(--step--1); font-weight:var(--w-label); letter-spacing:.12em;
   text-transform:uppercase; color:var(--ink-faint); margin:0 0 2rem;
 }
 
@@ -138,14 +162,14 @@ section{padding-block:clamp(2.75rem,7vh,4.5rem)}
 .app{
   display:flex; flex-direction:column; gap:.5rem;
   padding:1.4rem 1.4rem 1.5rem;
-  background:var(--paper); border:1px solid var(--rule); border-radius:14px;
+  background:var(--paper); border:1px solid var(--rule); border-radius:var(--radius);
   text-decoration:none;
   transition:border-color .18s ease, transform .18s ease;
 }
 .app:hover,.app:focus-visible{border-color:var(--brand); transform:translateY(-2px)}
 .app.lead{grid-column:1/-1; background:var(--brand-soft); border-color:var(--brand)}
 .app .tag{
-  font-size:var(--step--1); font-weight:600; letter-spacing:.1em;
+  font-size:var(--step--1); font-weight:var(--w-label); letter-spacing:.1em;
   text-transform:uppercase; color:var(--brand);
 }
 .app h3{font-size:var(--step-1)}
@@ -285,21 +309,40 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
         <span class="tag">Design tool</span>
         <h3>Golden Section Palette</h3>
         <p>Pick a colour and watch the golden rectangle build itself — thirteen
-           squares filling in turn, then the spiral tracing over the top. They
-           are coloured by size: the large ones take the bold, deep tones and
-           the small inner ones the pale tints, so the composition has somewhere
-           for the eye to rest. Below it a colour story gains a row as the window
-           widens, each row shorter than the last by φ.</p>
-        <p>The schemes are the classical wheel harmonies — monochromatic,
-           analogous, complementary, split, triad, tetrad and key colour, at
-           their traditional intervals — but worked in OKLCH, so every family
-           climbs the same tonal ladder and a complement comes back at the same
-           lightness as the colour it answers instead of one leg going muddy.
-           The wheel governs hue, φ governs proportion. A Colour Theory Wheel
-           sits alongside it, and either will hand you the whole set as CSS
-           custom properties.</p>
-        <span class="stack">Canvas animation &middot; OKLCH &middot; 7 wheel harmonies &middot; φ proportions &middot; no dependencies</span>
+           squares, each one the short side of whatever rectangle is left,
+           rotating right, top, left, bottom, with a quarter-circle arc per
+           square tracing the spiral over the top. They are toned by size: the
+           large squares take the deep values and the small inner ones the pale
+           tints, so the composition has somewhere for the eye to rest.</p>
+        <p>The colour is two algorithms, not one. Hue comes from the
+           <strong>classical wheel harmonies</strong> — monochromatic, analogous,
+           complementary, split, triad, tetrad and key colour — which are plain
+           rotations of 30°, 90°, 120°, 150° and 180°. Everything else is
+           <strong>OKLCH</strong>: the picked hex is converted through the Oklab
+           matrices, every family is run up the same nine-step lightness ladder,
+           and each step is converted back to sRGB. That is why a triad holds
+           together — its three legs land at the same lightness, which rotating
+           a hue in HSL will not give you. φ governs proportion, and the whole
+           set exports as CSS custom properties.</p>
+        <span class="stack">Classical harmonies &middot; OKLCH, hand-rolled &middot; canvas &middot; φ proportions &middot; no dependencies</span>
         <span class="cta">Build a palette &rarr;</span>
+      </a>
+
+      <a class="app" href="palette/wheel.html">
+        <span class="tag">Design tool</span>
+        <h3>Colour Theory Wheel</h3>
+        <p>The same harmonies the traditional way, and a teaching tool as much
+           as a generator. Six modes — monochromatic, analogous, complementary,
+           split-complementary, triad, tetrad — each drawn on the wheel with a
+           plain-English note on when it works, plus the tints and shades of
+           every hue it hands you. Hover a harmony to expand it, click any
+           swatch to copy, take the set as CSS variables.</p>
+        <p>Deliberately built on HSL rather than OKLCH: this one is about the
+           wheel as colour theory has always taught it, so the maths should be
+           the maths people already know. The Golden Section Palette is where
+           the perceptual version lives.</p>
+        <span class="stack">HSL &middot; 6 harmony modes &middot; tints and shades &middot; copy as CSS variables</span>
+        <span class="cta">Open the wheel &rarr;</span>
       </a>
 
       <div class="app app-multi">

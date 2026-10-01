@@ -98,7 +98,6 @@ body {
    of the row above it. Panels use φ flex ratios.
 ═══════════════════════════════════════════════════════════ */
 .gsp-showcase-wrap { margin-bottom: 1.4rem; }
-.gsp-showcase-label { font-size: 11px; color: var(--gsp-text-muted); letter-spacing: 0.10em; text-transform: uppercase; margin-bottom: 8px; }
 
 /* The grid container */
 .gsp-showcase {
@@ -154,7 +153,6 @@ body {
 .gsp-section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .gsp-section-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; border: 0.5px solid rgba(255,255,255,0.1); }
 .gsp-section-name { font-family: var(--gsp-font-display); font-size: 1rem; font-weight: 400; letter-spacing: 0.04em; }
-.gsp-section-desc { font-size: 11px; color: var(--gsp-text-muted); letter-spacing: 0.03em; }
 .gsp-chips-row { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; scrollbar-color: var(--gsp-ctrl-border) transparent; }
 .gsp-chip { flex: 1; min-width: 62px; height: var(--gsp-chip-height); border-radius: var(--gsp-chip-radius); padding: 8px 9px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; border: 0.5px solid var(--gsp-chip-border); transition: transform .13s ease,border-color .13s; position: relative; overflow: hidden; flex-shrink: 0; }
 .gsp-chip:hover { transform: translateY(-3px) scale(1.03); border-color: rgba(255,255,255,0.25); z-index: 1; }
@@ -214,7 +212,6 @@ body {
   <div class="gsp-schemes" id="gsp-schemes"></div>
 
   <div class="gsp-showcase-wrap">
-    <p class="gsp-showcase-label">Color story — φ proportions</p>
     <div class="gsp-showcase" id="gsp-showcase"></div>
     <div class="gsp-iter-strip" id="gsp-iter-strip"></div>
   </div>
@@ -657,7 +654,6 @@ body {
       const dot=document.createElement('div');dot.className='gsp-section-dot';dot.style.background=fam.chips[4].hex;
       hdr.appendChild(dot);
       const nm=document.createElement('span');nm.className='gsp-section-name';nm.textContent=fam.label;hdr.appendChild(nm);
-      const ds=document.createElement('span');ds.className='gsp-section-desc';ds.textContent=fam.sub;hdr.appendChild(ds);
       sec.appendChild(hdr);
       const row=document.createElement('div');row.className='gsp-chips-row';
       fam.chips.forEach(c=>{

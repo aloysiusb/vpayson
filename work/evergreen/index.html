@@ -11,6 +11,29 @@
 <meta property="og:type" content="article">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%231f5c47'/><text y='.72em' x='50%25' text-anchor='middle' font-size='62' font-family='system-ui' fill='%23fff'>V</text></svg>">
 
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,100..1000&display=swap" rel="stylesheet">
+<script>
+/* Theme overrides saved from /settings.html. Runs before paint so the page
+   never flashes the default palette first. Silently does nothing if storage
+   is unavailable (private browsing) — the CSS defaults below still stand. */
+(function(){
+  try{
+    var t = JSON.parse(localStorage.getItem('vp_theme') || '{}'), r = document.documentElement;
+    if(t.hue != null)       r.style.setProperty('--hue', t.hue);
+    if(t.chroma != null)    r.style.setProperty('--chroma', t.chroma);
+    if(t.accentHue != null) r.style.setProperty('--accent-hue', t.accentHue);
+    if(t.fontStack)         r.style.setProperty('--font', t.fontStack);
+    if(t.fontHref){
+      var l = document.createElement('link');
+      l.rel = 'stylesheet'; l.href = t.fontHref;
+      document.head.appendChild(l);
+    }
+  }catch(e){}
+})();
+</script>
+
 <style>
 /* Same tokens as the home page — one system, two pages. */
 :root{
@@ -25,7 +48,8 @@
   --rule:       oklch(89% .012 var(--hue));
   --brand:      oklch(43% var(--chroma) var(--hue));
   --brand-soft: oklch(95% .022 var(--hue));
-  --accent:     oklch(55% .13 48);
+  --accent-hue: 48;
+  --accent:     oklch(55% .13 var(--accent-hue));
 
   --measure: 34rem;
   --gutter: clamp(1.25rem, 5vw, 4rem);
@@ -52,7 +76,7 @@
     --rule:       oklch(30% .018 var(--hue));
     --brand:      oklch(78% .09 var(--hue));
     --brand-soft: oklch(26% .03 var(--hue));
-    --accent:     oklch(72% .12 48);
+    --accent:     oklch(72% .12 var(--accent-hue));
   }
 }
 

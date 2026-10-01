@@ -80,7 +80,7 @@
   --step-0:  calc(clamp(1rem, .96rem + .2vw, 1.09rem) * var(--scale));
   --step-1:  calc(clamp(1.2rem, 1.12rem + .4vw, 1.45rem) * var(--scale));
   --step-2:  calc(clamp(1.55rem, 1.36rem + .95vw, 2.15rem) * var(--scale));
-  --step-3:  calc(clamp(2.3rem, 1.7rem + 2.9vw, 4.2rem) * var(--scale));
+  --step-3:  calc(clamp(1.85rem, 1.5rem + 1.7vw, 2.9rem) * var(--scale));
 
   --font: "Google Sans Flex", "Google Sans", ui-sans-serif, system-ui,
           -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -117,7 +117,7 @@ a{color:inherit}
 .shell{max-width:var(--shell); margin-inline:auto; padding-inline:var(--gutter)}
 
 /* ──────────────────────────────  HERO  ────────────────────────── */
-.hero{padding-block:clamp(4rem,14vh,8.5rem) clamp(3rem,9vh,5.5rem)}
+.hero{padding-block:clamp(2.75rem,9vh,5.5rem) clamp(2.25rem,7vh,4rem)}
 .eyebrow{
   font-size:var(--step--1); font-weight:var(--w-label); letter-spacing:.12em;
   text-transform:uppercase; color:var(--brand); margin:0 0 1.4rem;
@@ -128,7 +128,8 @@ a{color:inherit}
 }
 .hero h1 .quiet{
   color:var(--ink-faint); display:block;
-  font-weight:var(--w-display); letter-spacing:var(--track-display);
+  font-size:var(--step-2); font-weight:var(--w-display);
+  letter-spacing:var(--track-display); margin-block-start:.15em;
 }
 .lede{font-size:var(--step-1); color:var(--ink-soft); max-width:var(--measure); margin-block-start:1.6rem}
 .hero-meta{
@@ -266,9 +267,9 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
     <p class="eyebrow">Basalt, Colorado</p>
     <h1>Virginia P. Payson<span class="quiet">Websites and applications, designed and built</span></h1>
     <p class="lede">
-      Independent designer and developer. I build fast, accessible, genuinely
-      maintainable websites and applications — and I have been doing it in the Roaring Fork
-      Valley since 2002.
+      Independent designer and developer, working in the Roaring Fork Valley
+      since 2002. I make websites and applications, and try to leave them fast,
+      accessible, and easy for someone else to pick up later.
     </p>
     <div class="hero-meta">
       <span><strong>24 years</strong> in this valley</span>
@@ -276,8 +277,8 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
       <!-- RISD deliberately not cited here for now. The differentiator is doing
            both halves of the job, not where the design half was taught. To put
            it back: <strong>RISD</strong>-trained designer who writes the backend -->
-      <span>A <strong>designer</strong> who writes the backend</span>
-      <span><strong>Apps in daily use</strong>, not just sites</span>
+      <span>The <strong>design</strong> and the <strong>backend</strong></span>
+      <span>Some of it in <strong>daily use</strong></span>
     </div>
     <div class="phi" aria-hidden="true">
       <span></span><span></span><span></span><span></span><span></span>
@@ -285,7 +286,7 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
   </header>
 
   <section class="shell">
-    <h2 class="section-head">Recent work &mdash; live, and you can open it</h2>
+    <h2 class="section-head">Recent work &mdash; live, if you would like a look</h2>
     <div class="apps">
 
       <a class="app lead" href="work/evergreen/">
@@ -321,8 +322,8 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
            <strong>OKLCH</strong>: the picked hex is converted through the Oklab
            matrices, every family is run up the same nine-step lightness ladder,
            and each step is converted back to sRGB. That is why a triad holds
-           together — its three legs land at the same lightness, which rotating
-           a hue in HSL will not give you. φ governs proportion, and the whole
+           together — its three legs land at the same lightness, which a
+           rotation in HSL does not guarantee. φ governs proportion, and the whole
            set exports as CSS custom properties.</p>
         <span class="stack">Classical harmonies &middot; OKLCH, hand-rolled &middot; canvas &middot; φ proportions &middot; no dependencies</span>
         <span class="cta">Build a palette &rarr;</span>
@@ -452,15 +453,16 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
       <div class="card">
         <span class="mark" aria-hidden="true"></span>
         <h3>HTML and CSS first</h3>
-        <p>Structure and styling in markup, JavaScript only where it genuinely adds
-           behaviour. Lightweight sites stay fast, and they stay maintainable long
-           after launch.</p>
+        <p>Structure and styling in markup, with JavaScript where it adds
+           behaviour. Lighter pages tend to stay quick, and tend to stay easier
+           to change a few years on.</p>
       </div>
       <div class="card">
         <span class="mark" aria-hidden="true"></span>
-        <h3>Accessible by construction</h3>
-        <p>WCAG 2.1 AA built in from the design stage — real contrast, real keyboard
-           support, real screen-reader testing. Never an overlay widget.</p>
+        <h3>Accessible from the start</h3>
+        <p>WCAG 2.1 AA considered at the design stage rather than patched on at
+           the end: contrast, keyboard support, screen-reader testing. Not an
+           accessibility overlay — they tend to cause more than they fix.</p>
       </div>
       <div class="card">
         <span class="mark" aria-hidden="true"></span>

@@ -1,0 +1,3146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BAM Investigation — Corporate Structure &amp; Legally Mine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,400..1000&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Google Sans Flex', -apple-system, BlinkMacSystemFont, sans-serif; background: #211a22; }
+
+#viewport {
+  width: 100vw; height: 100vh; position: relative; overflow: hidden;
+  cursor: grab; background: #211a22;
+}
+#viewport.panning { cursor: grabbing; }
+
+#world {
+  position: absolute; top: 0; left: 0;
+  transform-origin: 0 0;
+  width: 5000px; height: 2550px;
+}
+
+svg#lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible; }
+
+/* ===== Zone backgrounds ===== */
+.zone {
+  position: absolute; border-radius: 32px; z-index: 0;
+  display: flex; align-items: flex-start; justify-content: flex-start;
+}
+.zone .zone-label {
+  position: absolute; top: 18px; left: 28px;
+  font-size: 15px; font-weight: 700; letter-spacing: .02em;
+}
+.zone .zone-sublabel {
+  position: absolute; top: 40px; left: 28px;
+  font-size: 10.5px; opacity: .75;
+}
+.zone.corporate { background: rgba(95, 168, 240, 0.10); border: 2px dashed rgba(95, 168, 240, 0.45); }
+.zone.corporate .zone-label, .zone.corporate .zone-sublabel { color: #9cc6f5; }
+.zone.legallymine { background: rgba(235, 130, 85, 0.10); border: 2px dashed rgba(235, 130, 85, 0.45); }
+.zone.legallymine .zone-label, .zone.legallymine .zone-sublabel { color: #f0ad85; }
+
+/* ===== Sub-cluster tint regions ===== */
+.cluster {
+  position: absolute; border-radius: 20px; z-index: 0;
+  pointer-events: none;
+}
+.cluster .cluster-label {
+  position: absolute; top: 8px; left: 14px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; opacity: .8;
+}
+/* corporate zone clusters — cool blue family, distinguished by hue/tint */
+.cluster.cl-officers   { background: rgba(95, 168, 240, 0.09);  border: 1.5px dashed rgba(95, 168, 240, 0.40); }
+.cluster.cl-officers .cluster-label { color: #9cc6f5; }
+.cluster.cl-delaware   { background: rgba(90, 210, 160, 0.10);  border: 1.5px dashed rgba(90, 210, 160, 0.42); }
+.cluster.cl-delaware .cluster-label { color: #a3ecd1; }
+.cluster.cl-storeweb   { background: rgba(255, 178, 95, 0.10);  border: 1.5px dashed rgba(255, 178, 95, 0.42); }
+.cluster.cl-storeweb .cluster-label { color: #ffcb96; }
+.cluster.cl-fdd        { background: rgba(200, 150, 80, 0.10);  border: 1.5px dashed rgba(200, 150, 80, 0.40); }
+.cluster.cl-fdd .cluster-label { color: #e3c594; }
+.cluster.cl-gap        { background: rgba(240, 130, 130, 0.10); border: 1.5px dashed rgba(240, 130, 130, 0.42); }
+.cluster.cl-gap .cluster-label { color: #f5a8a8; }
+
+/* legally mine zone clusters — warm coral/purple family */
+.cluster.cl-people     { background: rgba(165, 125, 210, 0.11); border: 1.5px dashed rgba(165, 125, 210, 0.42); }
+.cluster.cl-people .cluster-label { color: #d3b8ec; }
+.cluster.cl-renames    { background: rgba(235, 130, 85, 0.10);  border: 1.5px dashed rgba(235, 130, 85, 0.42); }
+.cluster.cl-renames .cluster-label { color: #f0ad85; }
+.cluster.cl-entityweb  { background: rgba(95, 168, 240, 0.08);  border: 1.5px dashed rgba(95, 168, 240, 0.38); }
+.cluster.cl-entityweb .cluster-label { color: #9cc6f5; }
+.cluster.cl-fusion     { background: rgba(255, 110, 110, 0.10); border: 1.5px dashed rgba(255, 110, 110, 0.40); }
+.cluster.cl-fusion .cluster-label { color: #ffaaaa; }
+.cluster.cl-alaska     { background: rgba(200, 150, 80, 0.10);  border: 1.5px dashed rgba(200, 150, 80, 0.40); }
+.cluster.cl-alaska .cluster-label { color: #e3c594; }
+
+/* ===== Nodes ===== */
+.node {
+  position: absolute; z-index: 10;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; cursor: pointer; user-select: none;
+  font-size: 19px; font-weight: 800; line-height: 1.24; letter-spacing: -0.02em;
+  padding: 11px; word-break: break-word; border-radius: 50%;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.18);
+  transition: box-shadow .15s, transform .1s;
+}
+.node:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.25); transform: scale(1.04); z-index: 20; }
+.node span.lbl { pointer-events: none; }
+.node .clickhint { display:block; font-size:10px; opacity:0.55; margin-top:3px; font-weight:400; }
+
+.avatar {
+  width: 40px; height: 40px; border-radius: 50%; margin-bottom: 4px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.55); border: 2px solid rgba(0,0,0,0.15);
+  font-size: 20px; pointer-events: none;
+}
+
+.node.center      { background:hsl(0,0%,16%); border:9px solid hsl(0,0%,62%); color:#ffffff; font-size:19px; }
+.node.branch      { background:hsl(33,38%,93%); border:9px solid hsl(33,45%,36%); color:#2e2008; }
+.node.confirmed   { background:hsl(135,45%,90%); border:9px solid hsl(135,45%,30%); color:#103a06; }
+.node.warning     { background:hsl(42,85%,89%); border:9px solid hsl(42,85%,38%); color:#3a2400; }
+.node.danger      { background:hsl(8,65%,91%); border:9px solid hsl(8,65%,40%); color:#4a0808; }
+.node.bomb        { background:hsl(350,82%,14%); border:9px solid hsl(350,82%,62%); color:#ffd9d9; font-size:16.5px; }
+.node.entity      { background:hsl(210,62%,91%); border:9px solid hsl(210,62%,38%); color:#062c4d; }
+.node.person      { background:hsl(275,50%,91%); border:9px solid hsl(275,50%,38%); color:#2c0f4d; }
+.node.fbi         { background:hsl(230,62%,15%); border:9px solid hsl(230,62%,60%); color:#d6e4ff; font-size:16.5px; }
+.node.keyfind     { background:hsl(165,70%,16%); border:10px solid hsl(165,70%,64%); color:#d6f5e8; font-size:16.5px; }
+.node.dissolved   { background:hsl(0,0%,85%); border:9px dashed hsl(0,0%,38%); color:#2c2c2c; font-size:16.5px; }
+.node.replacement { background:hsl(22,85%,17%); border:9px solid hsl(22,85%,64%); color:#ffe2c2; font-size:16.5px; }
+.node.sticky   {
+  border-radius:10px;background:#fffde7;border:4px solid #b8a52a;
+  color:#4a440a;font-size:16.5px;width:200px;height:auto;
+  min-height:64px;padding:14px 17px;line-height:1.5;cursor:default;
+}
+.node.sticky:hover { transform: none; box-shadow: 0 2px 6px rgba(0,0,0,0.12); }
+
+line.web-line         { stroke:#ccc;stroke-width:1.2px; }
+line.web-line.strong  { stroke:#999;stroke-width:2.2px; }
+line.web-line.confirm { stroke:#3b6d11;stroke-width:1.8px; }
+line.web-line.warn    { stroke:#854f0b;stroke-width:1.2px;stroke-dasharray:5 3; }
+line.web-line.danger  { stroke:#e06060;stroke-width:1.2px;stroke-dasharray:5 3; }
+line.web-line.keyfind{ stroke:#7ab44a;stroke-width:3px; }
+line.web-line.fbi     { stroke:#4488ff;stroke-width:1.8px; }
+line.web-line.bomb    { stroke:#ff4444;stroke-width:1.8px;stroke-dasharray:6 2; }
+line.web-line.replacement { stroke:#ff9933;stroke-width:2px;stroke-dasharray:2 2; }
+line.web-line.ownership { stroke:#0c447c;stroke-width:2px; }
+
+/* ===== Controls ===== */
+#controls {
+  position:fixed;top:12px;left:50%;transform:translateX(-50%);
+  z-index:300;display:flex;gap:6px;align-items:center;
+  background:rgba(255,255,255,0.97);border:1px solid #ddd;
+  border-radius:10px;padding:7px 10px;
+  box-shadow:0 2px 10px rgba(0,0,0,0.12);
+}
+#controls button {
+  font-size:11px;padding:5px 11px;border:1px solid #ccc;
+  border-radius:6px;background:#fff;cursor:pointer;color:#333;white-space:nowrap;
+}
+#controls button:hover{background:#f0f0f0;}
+#zoomLabel{font-size:11px;color:#888;min-width:42px;text-align:center;}
+
+#legend {
+  position:fixed;bottom:14px;left:14px;z-index:300;
+  background:rgba(255,255,255,0.97);border:1px solid #ddd;
+  border-radius:8px;padding:10px 14px;font-size:10px;line-height:1.9;
+  max-height:50vh;overflow-y:auto;
+}
+#legend div{display:flex;align-items:center;gap:7px;}
+.dot{width:13px;height:13px;border-radius:50%;flex-shrink:0;}
+
+#hint {
+  position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
+  font-size:10.5px;color:#999;pointer-events:none;z-index:300;
+  background:rgba(255,255,255,0.9);padding:5px 14px;border-radius:20px;white-space:nowrap;
+}
+
+/* ===== Edit mode ===== */
+#editModeBtn.active { background:#2a5008;color:#fff;border-color:#2a5008; }
+body.edit-mode #viewport { cursor: default; }
+body.edit-mode .node { cursor: grab; }
+body.edit-mode .node:active { cursor: grabbing; }
+body.edit-mode .node.dragging { opacity: 0.85; box-shadow: 0 8px 24px rgba(0,0,0,0.35); z-index: 50; }
+body.edit-mode .node::after {
+  content: '✎'; position: absolute; top: -6px; right: -6px;
+  width: 22px; height: 22px; border-radius: 50%; background: #2a5008; color: #fff;
+  font-size: 12px; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3); pointer-events: none;
+}
+body.edit-mode .node.sticky::after { top: -8px; right: -8px; }
+
+#editFormOverlay {
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(20,18,14,0.5);z-index:500;display:none;
+  align-items:center;justify-content:center;
+}
+#editForm {
+  width:480px;max-width:92vw;max-height:88vh;background:#fffdf8;
+  border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.35);
+  padding:24px;overflow-y:auto;font-size:13px;color:#2a2a2a;
+}
+#editForm h2 { font-size:16px;margin-bottom:14px;color:#1a1a1a; }
+#editForm label { display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#888;margin:14px 0 5px; }
+#editForm input[type=text], #editForm textarea {
+  width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:7px;
+  font-size:13px;font-family:inherit;resize:vertical;
+}
+#editForm textarea { min-height:60px; }
+#editForm .sectionBlock { border:1.5px solid #e8e3d4;border-radius:8px;padding:12px;margin-bottom:10px;background:#f9f7f0; }
+#editForm .sectionBlock .removeBtn, #editForm .docRow .removeBtn, #editForm .bulletRow .removeBtn {
+  background:#fce8e8;color:#a01818;border:1px solid #e0a0a0;border-radius:5px;
+  font-size:11px;padding:2px 7px;cursor:pointer;float:right;
+}
+#editForm .bulletRow, #editForm .docRow { display:flex;gap:6px;margin-bottom:6px;align-items:flex-start; }
+#editForm .bulletRow textarea, #editForm .docRow input { flex:1; }
+#editForm .addBtn {
+  font-size:11.5px;padding:5px 10px;border:1px dashed #999;border-radius:6px;
+  background:#fff;cursor:pointer;color:#555;margin-top:4px;
+}
+#editForm .addBtn:hover { background:#f0f0f0; }
+#editForm .formButtons { display:flex;gap:10px;margin-top:20px;position:sticky;bottom:0;background:#fffdf8;padding-top:12px; }
+#editForm .saveBtn { flex:1;background:#2a5008;color:#fff;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:600;cursor:pointer; }
+#editForm .cancelBtn { background:#eee;color:#555;border:none;border-radius:8px;padding:11px 18px;font-size:14px;cursor:pointer; }
+#editForm .deleteBtn { background:#fce8e8;color:#a01818;border:1px solid #e0a0a0;border-radius:8px;padding:11px 14px;font-size:13px;cursor:pointer; }
+#editForm .avatarPreview { width:44px;height:44px;border-radius:50%;background:#f0ece4;border:1.5px solid #c0b090;display:flex;align-items:center;justify-content:center;font-size:22px;margin-top:6px; }
+
+/* ===== Color panel ===== */
+#colorPanelOverlay {
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(20,18,14,0.5);z-index:500;display:none;
+  align-items:center;justify-content:center;
+}
+#colorPanel {
+  width:780px;max-width:97vw;max-height:90vh;background:#fffdf8;
+  border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.35);
+  padding:24px;overflow-y:auto;font-size:13px;color:#2a2a2a;position:relative;
+}
+#colorPanel h2 { font-size:16px;margin-bottom:6px;color:#1a1a1a; }
+
+#panelStyleOverlay {
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(20,18,14,0.5);z-index:500;display:none;
+  align-items:center;justify-content:center;
+}
+#panelStylePanel {
+  width:620px;max-width:96vw;max-height:88vh;background:#fffdf8;
+  border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.35);
+  padding:24px;overflow-y:auto;font-size:13px;color:#2a2a2a;position:relative;
+}
+#panelStylePanel h2 { font-size:16px;margin-bottom:6px;color:#1a1a1a; }
+#colorPanel .colorPanelHint { font-size:11.5px;color:#888;margin-bottom:16px; }
+.colorRow { display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #eee2cc; }
+.colorRow:last-child { border-bottom:none; }
+.colorRow .swatch { width:36px;height:36px;border-radius:50%;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.25); }
+.colorRow .rowLabel { width:104px;flex-shrink:0;font-weight:600;font-size:11.5px; }
+.colorRow .sliderGroup { flex:1;display:flex;flex-direction:column;gap:4px; }
+.colorRow .sliderLine { display:flex;align-items:center;gap:7px; }
+.colorRow .sliderLine label { font-size:10.5px;color:#999;width:32px;flex-shrink:0; }
+.colorRow .sliderLine input[type=range] { flex:1; }
+.colorRow .sliderLine span.val { font-size:10.5px;color:#999;width:28px;text-align:right;flex-shrink:0; }
+#colorPanel .formButtons { display:flex;gap:10px;margin-top:18px;position:sticky;bottom:0;background:#fffdf8;padding-top:12px; }
+
+/* ===== Detail panel ===== */
+#overlay {
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(20,18,14,0.45);z-index:400;display:none;
+  align-items:center;justify-content:flex-end;
+}
+#detailPanel {
+  width:440px;max-width:92vw;height:100%;background:#fffdf8;
+  box-shadow:-6px 0 24px rgba(0,0,0,0.25);
+  padding:28px 26px;overflow-y:auto;
+  font-size:13.5px;color:#2a2a2a;line-height:1.6;
+}
+#detailPanel .headerRow { display:flex; align-items:center; gap:14px; margin-bottom:6px; }
+#detailPanel .avatarBig {
+  width:54px;height:54px;border-radius:50%;flex-shrink:0;
+  background:#f0ece4;border:2px solid #c0b090;
+  display:flex;align-items:center;justify-content:center;font-size:26px;
+}
+#detailPanel h2 { font-size:18px;color:#1a1a1a;line-height:1.3; }
+#detailPanel .subtitle{ font-size:11.5px;color:#888;margin-bottom:16px;text-transform:uppercase;letter-spacing:.04em;}
+#detailPanel .tag {
+  display:inline-block;font-size:10px;font-weight:700;padding:3px 9px;border-radius:12px;
+  margin-bottom:16px;text-transform:uppercase;letter-spacing:.03em;
+}
+#detailPanel .tag.bomb{background:#2a0505;color:#ff9999;}
+#detailPanel .tag.confirmed{background:#eaf3de;color:#3b6d11;}
+#detailPanel .tag.warning{background:#faeeda;color:#854f0b;}
+#detailPanel .tag.danger{background:#fce8e8;color:#a01818;}
+#detailPanel .tag.entity{background:#e6f3fb;color:#1a5a8a;}
+#detailPanel .tag.person{background:#f3e6fb;color:#5a2a8a;}
+#detailPanel .tag.fbi{background:#0a1a3a;color:#a8c8ff;}
+#detailPanel .tag.keyfind{background:#1a3a1a;color:#9ad97a;}
+#detailPanel .tag.dissolved{background:#e0e0e0;color:#555;}
+#detailPanel .tag.replacement{background:#3a1a00;color:#ffb366;}
+#detailPanel .tag.branch{background:#f0ece4;color:#6a5530;}
+#detailPanel section { margin-bottom:18px; }
+#detailPanel section h3 { font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:#999;margin-bottom:6px; }
+#detailPanel ul { padding-left:18px; margin-top:4px;}
+#detailPanel li { margin-bottom:5px; }
+#detailPanel .closeBtn {
+  position:absolute;top:20px;right:20px;background:none;border:none;
+  font-size:22px;color:#999;cursor:pointer;line-height:1;
+}
+#detailPanel .closeBtn:hover{color:#333;}
+#detailPanel .connections span {
+  display:inline-block;background:#f0ece4;border-radius:10px;padding:3px 10px;
+  font-size:11px;margin:0 4px 4px 0;color:#5a4a30;cursor:pointer;
+}
+/* Documents/links section */
+.docItem {
+  display:flex; align-items:center; gap:8px;
+  padding:8px 10px; margin-bottom:6px; border-radius:8px;
+  background:#f7f5ee; border:1px solid #e8e3d4; font-size:12.5px;
+}
+.docItem .docIcon { font-size:14px; opacity:.6; flex-shrink:0; }
+.docItem .docLabel { flex:1; color:#444; }
+.docItem.placeholder { border-style:dashed; color:#aaa; font-style:italic; }
+.docItem a { color:#1a5a8a; text-decoration:none; }
+.docItem a:hover { text-decoration:underline; }
+.addDocHint {
+  font-size:11px; color:#aaa; font-style:italic; padding:6px 2px;
+}
+
+/* ===== Zone / cluster edit mode ===== */
+body.edit-mode .zone { cursor:move; }
+body.edit-mode .zone:hover { outline:2px solid rgba(255,255,255,0.45); outline-offset:2px; }
+body.edit-mode .cluster { cursor:move; pointer-events:all; }
+body.edit-mode .cluster:hover { outline:2px solid rgba(255,255,255,0.3); outline-offset:2px; }
+.zone-edit-btn {
+  position:absolute; top:8px; right:8px; width:24px; height:24px; border-radius:50%;
+  background:rgba(255,255,255,0.55); border:1px solid rgba(255,255,255,0.7);
+  font-size:13px; display:none; align-items:center; justify-content:center;
+  cursor:pointer; z-index:3; color:#333; line-height:1;
+}
+body.edit-mode .zone-edit-btn { display:flex; }
+.zone-resize-handle {
+  position:absolute; bottom:5px; right:5px; width:18px; height:18px;
+  border-radius:4px; background:rgba(255,255,255,0.4); border:1px solid rgba(255,255,255,0.6);
+  cursor:se-resize; display:none; z-index:3;
+}
+body.edit-mode .zone-resize-handle { display:block; }
+
+/* ===== Zone edit panel ===== */
+#zoneEditOverlay {
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(20,18,14,0.5); z-index:500; display:none;
+  align-items:center; justify-content:center;
+}
+#zoneEditPanel {
+  width:520px; max-width:95vw; max-height:90vh; background:#fffdf8;
+  border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,0.35);
+  padding:24px; overflow-y:auto; font-size:13px; color:#2a2a2a; position:relative;
+}
+#zoneEditPanel h2 { font-size:16px; margin-bottom:14px; }
+#zoneEditPanel label { display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:#888; margin:12px 0 5px; }
+#zoneEditPanel input[type=text] { width:100%; padding:8px 10px; border:1.5px solid #ddd; border-radius:7px; font-size:13px; font-family:inherit; }
+#zoneEditPanel .zeSliderRow { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+#zoneEditPanel .zeSliderRow label { width:36px; margin:0; font-size:10.5px; color:#999; text-transform:none; letter-spacing:0; flex-shrink:0; }
+#zoneEditPanel .zeSliderRow input[type=range] { flex:1; }
+#zoneEditPanel .zeSliderRow span { font-size:10.5px; color:#999; width:32px; text-align:right; flex-shrink:0; }
+#zoneEditPanel .zeColorSec { border:1.5px solid #e8e3d4; border-radius:8px; padding:12px; margin-bottom:10px; background:#f9f7f0; }
+#zoneEditPanel .zeColorSec h3 { font-size:11px; font-weight:700; text-transform:uppercase; color:#888; margin-bottom:10px; display:flex; align-items:center; gap:10px; }
+#zoneEditPanel .zePreview { width:28px; height:28px; border-radius:5px; flex-shrink:0; border:1px solid #ccc; }
+#zoneEditPanel .formButtons { display:flex; gap:10px; margin-top:20px; position:sticky; bottom:0; background:#fffdf8; padding-top:12px; }
+#zoneEditPanel .saveBtn { flex:1; background:#2a5008; color:#fff; border:none; border-radius:8px; padding:11px; font-size:14px; font-weight:600; cursor:pointer; }
+#zoneEditPanel .cancelBtn { background:#eee; color:#555; border:none; border-radius:8px; padding:11px 18px; font-size:14px; cursor:pointer; }
+#zoneEditPanel .deleteBtn { background:#fce8e8; color:#a01818; border:1px solid #e0a0a0; border-radius:8px; padding:11px 14px; font-size:13px; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <button onclick="zoomBy(1.2)">+ Zoom in</button>
+  <span id="zoomLabel">100%</span>
+  <button onclick="zoomBy(0.83)">− Zoom out</button>
+  <button onclick="resetView()">Reset view</button>
+  <button onclick="fitAll()">Fit all</button>
+  <span style="width:1px;height:20px;background:#ddd;display:inline-block;margin:0 2px;"></span>
+  <button id="editModeBtn" onclick="toggleEditMode()">✏️ Edit mode: OFF</button>
+  <button id="colorPanelBtn" onclick="openColorPanel()" style="display:none;">🎨 Style</button>
+  <button id="panelStyleBtn" onclick="openPanelStylePanel()" style="display:none;">🖼️ Panels</button>
+  <button id="addNodeBtn" onclick="addNewNode()" style="display:none;">➕ Add node</button>
+  <button id="addZoneBtn" onclick="addNewZone()" style="display:none;">🗂️ Add zone</button>
+  <button id="exportBtn" onclick="exportReadOnly()" style="display:none;background:#1a3a1a;color:#fff;border-color:#1a3a1a;">⬇️ Export read-only</button>
+  <button id="resetDataBtn" onclick="resetAllEdits()" style="display:none;color:#a01818;">Reset all edits</button>
+  <span id="syncIndicator" style="display:none;font-size:11px;color:#888;"></span>
+</div>
+
+<div id="viewport">
+  <div id="world">
+    <!-- zone backgrounds injected by JS -->
+    <svg id="lines"></svg>
+    <!-- nodes injected by JS -->
+  </div>
+</div>
+
+<div id="legend">
+  <div><span class="dot" style="background:#1a1a1a"></span> Center</div>
+  <div><span class="dot" style="background:#f0ece4;border:1px solid #c0b090"></span> Branch topic</div>
+  <div><span class="dot" style="background:#eaf3de;border:1px solid #3b6d11"></span> ✓ Confirmed</div>
+  <div><span class="dot" style="background:#faeeda;border:1px solid #854f0b"></span> ⚠ Warning</div>
+  <div><span class="dot" style="background:#fce8e8;border:1px solid #e06060"></span> ? Open question</div>
+  <div><span class="dot" style="background:#2a0505;border:1px solid #ff4444"></span> 💣 Bombshell</div>
+  <div><span class="dot" style="background:#e6f3fb;border:1px solid #378add"></span> 🏢 Entity</div>
+  <div><span class="dot" style="background:#f3e6fb;border:1px solid #7b4dab"></span> 👤 Person</div>
+  <div><span class="dot" style="background:#0a1a3a;border:1px solid #4488ff"></span> 🔵 FBI-connected</div>
+  <div><span class="dot" style="background:#1a3a1a;border:2px solid #7ab44a"></span> ★ Key finding</div>
+  <div><span class="dot" style="background:#e0e0e0;border:1px dashed #999"></span> 💀 Dissolved</div>
+  <div><span class="dot" style="background:#3a1a00;border:1px solid #ff9933"></span> 🔁 Replacement entity</div>
+  <div><span class="dot" style="background:#fffde7;border:1px solid #ddd37a;border-radius:3px"></span> 📝 Note</div>
+  <div style="margin-top:8px;font-style:italic;opacity:.7;">Click any circle for full details</div>
+  <div style="margin-top:4px;font-style:italic;opacity:.6;">Dashed regions = zones &amp; sub-clusters</div>
+  <div style="margin-top:4px;font-style:italic;opacity:.6;">Bigger circle = higher importance</div>
+</div>
+
+<div id="hint">Drag to pan · Scroll/pinch to zoom · Click a node for details</div>
+
+<div id="overlay" onclick="if(event.target===this)closeDetail()">
+  <div id="detailPanel">
+    <button class="closeBtn" onclick="closeDetail()">&times;</button>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<div id="editFormOverlay" onclick="if(event.target===this)closeEditForm()">
+  <div id="editForm">
+    <div id="editFormContent"></div>
+  </div>
+</div>
+
+<div id="colorPanelOverlay" onclick="if(event.target===this)closeColorPanel()">
+  <div id="colorPanel">
+    <button class="closeBtn" onclick="closeColorPanel()">&times;</button>
+    <div id="colorPanelContent"></div>
+  </div>
+</div>
+
+<div id="zoneEditOverlay" onclick="if(event.target===this)closeZoneEditForm()">
+  <div id="zoneEditPanel">
+    <button class="closeBtn" onclick="closeZoneEditForm()">&times;</button>
+    <div id="zoneEditContent"></div>
+  </div>
+</div>
+
+<div id="panelStyleOverlay" onclick="if(event.target===this)closePanelStylePanel()">
+  <div id="panelStylePanel">
+    <button class="closeBtn" onclick="closePanelStylePanel()">&times;</button>
+    <div id="panelStyleContent"></div>
+  </div>
+</div>
+
+<script>
+const ZONES = [
+  { id:'corporate', label:'Corporate Structure', sublabel:'BAM Franchising · Delaware · FDD · store entities',
+    x:1987, y:77, w:2920, h:1753, cls:'corporate' },
+  { id:'legallymine', label:'Legally Mine Empire', sublabel:'Dan McNeff · asset protection network · renames',
+    x:77, y:77, w:1830, h:2414, cls:'legallymine' },
+];
+
+const CLUSTERS = [
+  { id:'c-officers', zone:'corporate', label:'FDD officers', x:2239, y:156, w:1090, h:447, cls:'cl-officers' },
+  { id:'c-delaware',  zone:'corporate', label:'Delaware / Oregon history', x:3387, y:156, w:739, h:584, cls:'cl-delaware' },
+  { id:'c-storeweb',  zone:'corporate', label:'Store-level entity web', x:3387, y:779, w:1480, h:544, cls:'cl-storeweb' },
+  { id:'c-fdd',        zone:'corporate', label:'FDD document', x:2239, y:662, w:1051, h:544, cls:'cl-fdd' },
+  { id:'c-gap',        zone:'corporate', label:'Open question', x:2239, y:1246, w:1051, h:507, cls:'cl-gap' },
+
+  { id:'lm-people',   zone:'legallymine', label:'People', x:137, y:156, w:837, h:467, cls:'cl-people' },
+  { id:'lm-renames',  zone:'legallymine', label:'2026 rename / clone', x:1051, y:156, w:779, h:467, cls:'cl-renames' },
+  { id:'lm-entityweb',zone:'legallymine', label:'Entity web', x:137, y:681, w:837, h:837, cls:'cl-entityweb' },
+  { id:'lm-fusion',   zone:'legallymine', label:'BAM ↔ Legally Mine fusion', x:1051, y:681, w:779, h:837, cls:'cl-fusion' },
+  { id:'lm-alaska',   zone:'legallymine', label:'Asset protection architecture', x:137, y:1577, w:1694, h:467, cls:'cl-alaska' },
+];
+
+const NODES = [
+
+{
+  id:'center', x:3037, y:934, type:'center', tier:1, label:'BAM\nFranchising\nInc.',
+  detail:{
+    title:'BAM Franchising, Inc.',
+    subtitle:'The corporate parent of Bricks & Minifigs',
+    tag:'entity',
+    sections:[
+      {h:'What it is', items:[
+        'Franchisor entity for the Bricks & Minifigs LEGO resale franchise chain (~300 locations, 72 disclosed in current FDD).',
+        'Originally an Oregon corporation, formed April 29, 2011.',
+        'Acquired/taken over by brothers Ammon McNeff (CEO) and Matt McNeff (COO) in 2018.',
+        'HQ in Provo/Orem, Utah.'
+      ]},
+      {h:'The Delaware move', items:[
+        'New Delaware corporation formed October 11, 2023 — File #2482543.',
+        'Merger completed April 18, 2024, with the Delaware entity surviving and the Oregon entity dissolving.',
+        'Only ~6 months after the merger, the Salem/Keizer store seizure occurred (Nov 2024).'
+      ]},
+      {h:'Open questions', items:[
+        'Is the Delaware entity actually in good standing? (free lookup is not certificate of status)',
+        'Willamette Forest Ops LLC (filed June 2026) lists BAM Franchising Inc. as a direct member — corporate may be directly operating stores, not just licensing the brand.'
+      ]}
+    ],
+    docs:[
+      {label:'Delaware entity search result — File #2482543', url:null},
+      {label:'2026 FDD — full PDF', url:null},
+      {label:'Oregon SOS — original 2011 incorporation record', url:null},
+    ]
+  }
+},
+
+{
+  id:'ammon', x:2406, y:282, type:'person', tier:1, label:'Ammon McNeff\nCEO BAM', avatar:'👤',
+  detail:{
+    title:'Ammon McNeff',
+    subtitle:'CEO & President, BAM Franchising / Bricks & Minifigs',
+    tag:'person',
+    sections:[
+      {h:'Role', items:[
+        'President since April 2018; CEO since October 2021.',
+        'Previously President of Legally Mine, LLC, January 2011 – 2020.',
+        "Co-owner of Kragle, LLC — BAM's own franchisee in Orem, UT — since June 2017.",
+        'Plaintiff in McNeff v. McNeff (federal case vs. father Dan), voluntarily dismissed with prejudice.'
+      ]}
+    ],
+    docs:[
+      {label:'McNeff v. McNeff complaint/docket', url:null},
+      {label:'FDD Item 2 — officer bio excerpt', url:null},
+    ]
+  }
+},
+{
+  id:'matt', x:2724, y:294, type:'person', tier:1, label:'Matt McNeff\nCOO BAM', avatar:'👤',
+  detail:{
+    title:'Matthew McNeff',
+    subtitle:'COO & Treasurer, BAM Franchising / Bricks & Minifigs',
+    tag:'person',
+    sections:[
+      {h:'Role', items:[
+        'Treasurer since April 2018 (FDD lists COO informally).',
+        'Previously VP of Marketing, Legally Mine LLC, January 2011 – 2020.',
+        'Co-owner of Kragle, LLC since June 2017.'
+      ]},
+      {h:'Willamette Forest Ops LLC — NEW (June 2026)', items:[
+        'Listed as a personal member (alongside BAM Franchising Inc. itself) of Willamette Forest Ops LLC, filed June 4, 2026.',
+        'Registry No. 258414797 — Oregon — 780 Blair Blvd, Eugene, OR (same address as the former Eugene Baker Bricks store).'
+      ]}
+    ],
+    docs:[
+      {label:'Willamette Forest Ops LLC — Oregon filing #258414797', url:null},
+      {label:'FDD Item 2 — officer bio excerpt', url:null},
+    ]
+  }
+},
+{
+  id:'reed', x:2980, y:232, type:'person', tier:3, label:'Reed Brimhall\nCFO', avatar:'👤',
+  detail:{
+    title:'Reed Brimhall',
+    subtitle:'Chief Financial Officer, BAM Franchising',
+    tag:'person',
+    sections:[{h:'Background', items:[
+      'CFO of the Franchisor and its Parent since June 2016.',
+      'Previously Senior EVP and CFO for Scentsy, Inc. (Meridian, Idaho) since January 2015.'
+    ]}],
+    docs:[{label:'FDD Item 2 — officer bio excerpt', url:null}]
+  }
+},
+{
+  id:'darin', x:3193, y:312, type:'person', tier:3, label:'Darin Hicks\nDevelopment', avatar:'👤',
+  detail:{
+    title:'Darin Hicks',
+    subtitle:'Fractional Chief Development Officer, BAM Franchising',
+    tag:'person',
+    sections:[{h:'Background', items:[
+      'Fractional CDO since January 2021; board member since June 2024.',
+      'Also serves/served as Chief Development Officer for Kid-to-Kid, Cheapskate, Key Renter, ARC Point Labs, and CityWide franchise brands.',
+      'President of Crest Consulting, LLC since April 2020.'
+    ]}],
+    docs:[{label:'FDD Item 2 — officer bio excerpt', url:null}]
+  }
+},
+{
+  id:'mikewu', x:2589, y:447, type:'person', tier:3, label:'Mike Wu\nCTO', avatar:'👤',
+  detail:{
+    title:'Mike Wu',
+    subtitle:'Chief Technology Officer, BAM Franchising',
+    tag:'person',
+    sections:[{h:'Background', items:[
+      'CTO since October 2023.',
+      'Founding CTO of VSCO (2011–2018); later roles at Seesaw Learning, Skillist, Numberball, and Handshake.',
+      'Opened his own Bricks & Minifigs franchise unit in San Ramon, CA in 2023 before becoming CTO.'
+    ]}],
+    docs:[{label:'FDD Item 2 — officer bio excerpt', url:null}]
+  }
+},
+{
+  id:'notdan', x:2869, y:468, type:'bomb', tier:1, label:'NOT in Item 2:\nDan McNeff',
+  detail:{
+    title:'Conspicuously Absent: Daniel McNeff',
+    subtitle:'Not listed anywhere in FDD Item 2 (Business Experience)',
+    tag:'bomb',
+    sections:[
+      {h:'Why this is notable', items:[
+        'Only five people are named as principal officers in Item 2: Ammon McNeff, Matt McNeff, Reed Brimhall, Darin Hicks, Mike Wu.',
+        'Daniel McNeff does not appear despite holding 79% of Legally Mine LLC, which itself held over $1M in BAM Franchising stock per arbitration exhibits.',
+        'Dan publicly claimed (Facebook, later deleted) to have been the original CEO of Bricks & Minifigs before being "illegally removed" by his sons.',
+        'Dan is named personally in the Ohio Supreme Court consent decree for unauthorized practice of law (Case No. 2025-0037).'
+      ]},
+      {h:'Legal significance', items:[
+        'FDD Item 3 disclosure obligations are explicitly tied to "any person identified in Item 2." Dan\'s absence from Item 2 means the Ohio decree against him may fall outside the strict letter of Item 3\'s disclosure trigger — even though it is highly relevant to who actually controls the brand.'
+      ]}
+    ],
+    docs:[
+      {label:'FDD Item 2 — full officer list', url:null},
+      {label:'Ohio Supreme Court consent decree, Case No. 2025-0037', url:null},
+      {label:"Dan's deleted Facebook post (archived screenshot)", url:null},
+    ]
+  }
+},
+
+{
+  id:'oregonold', x:3504, y:293, type:'entity', tier:3, label:'Oregon Corp\n2011',
+  detail:{
+    title:'BAM Franchising, Inc. — Oregon (original)',
+    subtitle:'Predecessor entity, formed April 29, 2011',
+    tag:'entity',
+    sections:[{h:'Facts', items:[
+      'Original incorporation of BAM Franchising as an Oregon corporation.',
+      'Operated for roughly 13 years before merging into the new Delaware entity.',
+      'Dissolved upon completion of the April 18, 2024 merger.'
+    ]}],
+    docs:[{label:'Oregon SOS — original incorporation record', url:null}]
+  }
+},
+{
+  id:'defind', x:3797, y:507, type:'keyfind', tier:1, label:"★ DE Corp\n#2482543",
+  detail:{
+    title:'★ Key Finding: The Delaware Corporation',
+    subtitle:'BAM Franchising, Inc. — Delaware File #2482543',
+    tag:'keyfind',
+    sections:[
+      {h:'The discovery — fully verifiable, no special access needed', items:[
+        'Found via the free, public Delaware Division of Corporations entity search at icis.corp.delaware.gov — anyone can reproduce this search by name in under a minute.',
+        'Domestic corporation, formed October 11, 2023.',
+        'Registered agent: Registered Agent Solutions Inc., 838 Walker Rd Suite 21-2, Dover, DE 19904.',
+        'This is the same entity referenced in other public coverage of BAM Franchising\u2019s corporate history.'
+      ]},
+      {h:'Why it matters', items:[
+        'Merger completed April 18, 2024, with the Delaware entity surviving and the Oregon entity dissolved.',
+        'Only ~6 months after that merger, the Crystal Law-Gorman/Keizer store seizure occurred (November 14, 2024).',
+        'Good standing remains UNCONFIRMED — requires a paid $10 Certificate of Status to verify.'
+      ]},
+      {h:'How to verify this yourself', items:[
+        'Go to icis.corp.delaware.gov, select "Entity Name Search," and search "BAM Franchising."',
+        'The Delaware filing number, formation date, and registered agent shown there will match exactly what is listed here — this is a public record, not a private tip.'
+      ]}
+    ],
+    docs:[
+      {label:'Delaware Division of Corporations — entity search result', url:null},
+      {label:'Certificate of Status ($10, not yet purchased)', url:null},
+    ]
+  }
+},
+{
+  id:'nx1', x:3521, y:606, type:'sticky', tier:3, label:"Share DE find\nwith BJC?\nSigned off when\nyou posted it!",
+  detail:null
+},
+
+{
+  id:'fdd', x:2491, y:818, type:'branch', tier:1, label:'FDD 2026\nDisclosure Doc',
+  detail:{
+    title:'2026 Franchise Disclosure Document',
+    subtitle:'Full review — fees, litigation disclosure, termination rights',
+    tag:'branch',
+    sections:[
+      {h:'Fee structure (corrected figures)', items:[
+        'Initial Franchise Fee: $40,000 (single-area); $25,000 (additional franchise).',
+        'Royalty: 6% of monthly Gross Revenue OR flat $500/month, whichever is greater.',
+        'Brand Fund: 1% of monthly Gross Revenue. Local marketing: minimum 3% of monthly Gross Revenue. Technology Fund: up to 1% (not currently instituted).',
+        "Transfer Fee: $30,000 + $10,000 mandatory training fee when buying an existing franchisee's business."
+      ]},
+      {h:'Item 3 (Litigation) disclosure gap', items:[
+        'Item 3 narrative discloses only ONE matter: the 2019 Washington AG no-poach Assurance of Discontinuance.',
+        'But Note 10 of the audited financials (bound into the same FDD) states "The Company is a defendant in certain legal actions and pending actions" — for FY2023, FY2024, AND FY2025.',
+        'FY2025 financials separately disclose an $18,000 settlement of a legal dispute as a subsequent event, not named anywhere in Item 3.',
+        'See full memo: FDD_Litigation_Disclosure_Memo.docx.'
+      ]},
+      {h:'Section 15.E — corporate can run the store directly', items:[
+        'Upon termination, pending sale of assets, "we may authorize continued temporary operations of your Store... subject to the supervision and control of one or more of our appointed managers."',
+        'This is the contractual mechanism that may explain the 4-month gap at the Keizer store where Brandon Best told police "corporate" held the store directly.'
+      ]}
+    ],
+    docs:[
+      {label:'Full 2026 FDD PDF (uploaded)', url:null},
+      {label:'FDD_Litigation_Disclosure_Memo.docx', url:null},
+      {label:'Washington AG Assurance of Discontinuance, No. 19-2-28285-1 SEA', url:null},
+    ]
+  }
+},
+{
+  id:'waag', x:2843, y:934, type:'warning', tier:3, label:'WA AG 2019\nno-poach',
+  detail:{
+    title:'Washington AG — 2019 Assurance of Discontinuance',
+    subtitle:'The one matter actually disclosed in Item 3',
+    tag:'warning',
+    sections:[{h:'Facts', items:[
+      'BAM agreed to no longer include or enforce no-poach provisions in franchise agreements.',
+      'BAM expressly denied wrongdoing; the AOD states it is not an admission of liability.'
+    ]}],
+    docs:[{label:'Washington AG Assurance of Discontinuance, No. 19-2-28285-1 SEA', url:null}]
+  }
+},
+{
+  id:'settlement18k', x:2341, y:1054, type:'bomb', tier:2, label:'$18K settlement\nnot named\nin Item 3',
+  detail:{
+    title:'The Unnamed $18,000 Settlement',
+    subtitle:'FY2025 audited financials, Note 11 — Subsequent Events',
+    tag:'bomb',
+    sections:[{h:'Facts', items:[
+      '"Subsequent to the balance sheet date the Company settled a legal dispute. The Company agreed to pay the sum of $18,000 which is accrued on the financial statements."',
+      'Not named, dated, or described anywhere in the Item 3 litigation narrative.',
+      'Settlements of material litigation are often required to be disclosed in Item 3 even after the case is closed.'
+    ]}],
+    docs:[{label:'FY2025 audited financials, Note 11', url:null}]
+  }
+},
+
+{
+  id:'willamette', x:3648, y:902, type:'replacement', tier:1, label:'🔁 Willamette\nForest Ops LLC',
+  detail:{
+    title:'🔁 Willamette Forest Ops LLC',
+    subtitle:'Filed June 4, 2026 — the replacement for Eugene Baker Bricks',
+    tag:'replacement',
+    sections:[
+      {h:'Filing details', items:[
+        'Filed: June 4, 2026. Oregon Registry No.: 258414797.',
+        'Principal address: 780 Blair Blvd, Eugene, OR — same address as the now-dissolved Eugene Baker Bricks Inc.',
+        'Registered agent: Oregon Registered Agent LLC.'
+      ]},
+      {h:'Members', items:[
+        'BAM Franchising, Inc. — direct member.',
+        'Matthew McNeff — direct member, personally.'
+      ]},
+      {h:'Why this is significant', items:[
+        'BAM Franchising Inc. as a direct LLC member differs sharply from a typical franchise-only structure.',
+        'Name contains zero reference to Bricks & Minifigs, Baker Bricks, or LEGO — notably generic compared to every other entity in this network.'
+      ]}
+    ],
+    docs:[{label:'Oregon SOS — Willamette Forest Ops LLC filing #258414797', url:null}]
+  }
+},
+{
+  id:'brandon', x:4211, y:1186, type:'person', tier:1, label:'Brandon Best', avatar:'👤',
+  detail:{
+    title:'Brandon Best',
+    subtitle:'Salem Baker Bricks Inc. · Baker Bricks, LLC (Utah)',
+    tag:'person',
+    sections:[
+      {h:'Role', items:[
+        'Named individual on Salem Baker Bricks Inc. (Oregon), the entity that opened at the Keizer store address the day after Crystal Law-Gorman\u2019s November 14, 2024 eviction.',
+        'Registered agent and a member of Baker Bricks, LLC (Utah, Entity #13967677-0160, formed May 2, 2024), alongside Joshua Johnson.',
+        'Per BAM Franchising\u2019s own court complaint: "In or about the first quarter of 2025, Josh and Brandon agreed to clean up, manage and operate the BAM repossessed store in Salem, which was subsequently sold and transferred, along with the store\u2019s assets, to Baker Salem (i.e., owned by Josh and Brandon)."',
+        'Told police that "corporate" held the Keizer store directly before he "took over" in March 2025 — language that lines up with the FDD\u2019s Section 15.E "appointed managers" provision for terminated stores pending sale.'
+      ]},
+      {h:'Open questions', items:[
+        'Brandon\u2019s exact relationship to BAM Franchising prior to the Baker Bricks Inc./LLC purchase is not yet fully documented.',
+        'Unclear whether Baker Bricks, LLC (Utah) ever obtained foreign registration to legally operate the Oregon store under its own name.'
+      ]}
+    ],
+    docs:[
+      {label:'Oregon SOS — Salem Baker Bricks Inc. filing', url:null},
+      {label:'Utah DOC — Baker Bricks, LLC #13967677-0160', url:null},
+      {label:'BAM v. [Salem LLC] complaint — Q1 2025 excerpt', url:null},
+      {label:'Police report — Brandon Best statement on "corporate" operation', url:null},
+    ]
+  }
+},
+{
+  id:'baker_inc', x:4049, y:1051, type:'dissolved', tier:2, label:'Salem Baker\nBricks Inc.',
+  detail:{
+    title:'Salem Baker Bricks Inc.',
+    subtitle:'Oregon — dissolved ~January 15–16, 2026',
+    tag:'dissolved',
+    sections:[
+      {h:'Timeline', items:[
+        "Opened the day after Crystal Law-Gorman's November 14, 2024 eviction, at the same store address.",
+        'Brandon Best is the named individual on the entity.',
+        "Dissolved approximately January 15–16, 2026 — just days after Reckless Ben's wrong-entity small claims case was dismissed (Jan 8, 2026)."
+      ]},
+      {h:'The gap this creates', items:[
+        'Baker Bricks, LLC (the separate Utah entity) was not reinstated until May 27, 2026.',
+        'That leaves roughly four months (mid-Jan to late-May 2026) where NEITHER known entity legally existed — yet the store at 3670 River Rd N, Keizer remains open per current Yelp listing.',
+        'OPEN QUESTION: what entity, if any, legally operated the store during this second gap?'
+      ]}
+    ],
+    docs:[
+      {label:'Oregon SOS — Salem Baker Bricks Inc. dissolution record', url:null},
+      {label:'Yelp listing — Bricks & Minifigs, Keizer (still open, updated June 2026)', url:null},
+    ]
+  }
+},
+{
+  id:'fddgap', x:3804, y:913, type:'bomb', tier:1, label:'OPEN: missing\nKeizer subsidiary\nin FDD',
+  detail:{
+    title:'The Missing Keizer Subsidiary — A Reddit-Sourced Finding',
+    subtitle:'r/RecklessBen — Legal/Documents flair — found via public records research',
+    tag:'bomb',
+    sections:[
+      {h:'The pattern this breaks', items:[
+        'For every other corporate-owned outlet, BAM Franchising uses a dedicated wholly-owned LLC subsidiary, individually named in the FDD — e.g. BAMF Southington CT LLC for the Southington, CT location.',
+        'Each of these subsidiary LLCs is listed by name in the FDD\u2019s corporate structure disclosures.'
+      ]},
+      {h:'What is missing for Keizer', items:[
+        'The 2025 FDD lists the Keizer, OR outlet under "Outlets Owned and Operated by Corporate as of December 31, 2024" with the notation: "Zach Giles, Keizer, OR 97303 (Operated by an entity owned by BAM Franchising Inc.)"',
+        'No "BAMF Keizer LLC," "BAMF Salem LLC," or any equivalent named subsidiary appears anywhere in the 2025 or 2026 FDD \u2014 unlike every comparable corporate-owned outlet.',
+        'The 2026 FDD also contains no Item 20 disclosure of the March 27, 2025 sale of this outlet to Baker (Joshua Johnson / Brandon Best) \u2014 a transaction BAM\u2019s own court complaint confirms took place.'
+      ]},
+      {h:'Documented timeline (from FDDs and BAM\u2019s own complaint)', items:[
+        'Feb 2, 2023 \u2014 BAM sold BAMF Salem (the Keizer-area outlet) to an outside party (Crystal Law-Gorman) for $65,000, financed by a $45,000 note receivable, per the 2024 FDD.',
+        'Nov 14, 2024 \u2014 BAM issued a Notice of Immediate Termination, repossessed the store, and assumed the lease and assets, crediting an estimated $38,000 against a $175,000 debt, per BAM\u2019s own complaint.',
+        'Dec 31, 2024 (FDD snapshot date) \u2014 the 2025 FDD lists the outlet as corporate-owned, "operated by an entity owned by BAM Franchising Inc." \u2014 but never names that entity.',
+        'Mar 27, 2025 \u2014 BAM finalized a Business and Asset Purchase Agreement selling the store to Baker (Johnson/Best), per BAM\u2019s complaint \u2014 a sale never disclosed in the following year\u2019s FDD.'
+      ]},
+      {h:'Possible explanations (unconfirmed)', items:[
+        'BAM Franchising Inc. may have owned and operated the store directly during this window \u2014 with no separate LLC ever created \u2014 using the Section 15.E "appointed managers" provision rather than the usual dedicated-subsidiary structure.',
+        'FDD Item 20 outlet-sale disclosure tables are typically keyed to a specific fiscal year-end snapshot; the omission could partly reflect a reporting-period/format quirk rather than a deliberate gap, though that would not explain why no entity name appears at all.',
+        'An entity may exist that has not yet surfaced in any filing search \u2014 the same category of blind spot Willamette Forest Ops represented before it was found.'
+      ]}
+    ],
+    docs:[
+      {label:'r/RecklessBen — Legal/Documents flair — original post', url:null},
+      {label:'2024 FDD — BAMF Salem sale to Law-Gorman, $65,000', url:null},
+      {label:'2025 FDD — Keizer listed as corporate-owned, entity unnamed', url:null},
+      {label:'2026 FDD — no Item 20 disclosure of March 2025 sale', url:null},
+      {label:'BAM v. [Salem LLC] complaint — repossession and APA excerpts', url:null},
+    ]
+  }
+},
+{
+  id:'baker_llc', x:4438, y:934, type:'entity', tier:2, label:'Baker Bricks\nLLC (Utah)',
+  detail:{
+    title:'Baker Bricks, LLC',
+    subtitle:'Utah — Entity #13967677-0160',
+    tag:'entity',
+    sections:[
+      {h:'Filing details (confirmed via Utah DOC lookup)', items:[
+        'Formation Date: May 2, 2024 — Domestic Limited Liability Company.',
+        'Entity Status: Active. Renew By Date: May 31, 2027. Status Updated On: May 27, 2026.',
+        'Principal office: 2100 E Creek Road, Cottonwood Heights, UT 84093.',
+        'Registered agent: Brandon Best (individual), same address.',
+        'Members: Brandon Best (same address) and Joshua Johnson (374 Storrs Ave, American Fork, UT 84003) — first formal documentation of Johnson as a named member, not just a self-claimed co-owner to police.'
+      ]},
+      {h:'Why the formation date matters', items:[
+        'May 2, 2024 is roughly six months BEFORE the November 14, 2024 Keizer repossession, and about ten months before the March 27, 2025 sale to Baker (Johnson/Best).',
+        'This means the entity already existed well before it became the buyer of the Keizer store — it was not necessarily created reactively after the repossession.'
+      ]},
+      {h:'NEEDS RE-VERIFICATION — dissolution/reinstatement claim', items:[
+        'An earlier pass of this research recorded a dissolution on October 21, 2025 and a reinstatement on May 27, 2026 at 1:08pm, the same day the RICO complaint against Reckless Ben was filed.',
+        'The direct Utah DOC entity lookup (confirmed June 2026) shows the entity as Active with no dissolution history visible on that view — "Status Updated On: May 27, 2026" may simply reflect a routine annual renewal rather than a reinstatement after dissolution.',
+        'This discrepancy is not yet resolved. It is possible the dissolution/reinstatement record came from a different document (e.g. a specific reinstatement filing) that exists alongside the current Active status, or it is possible that detail was a misread. Treat the dissolution/reinstatement claim as unconfirmed until the underlying source is re-checked.',
+        'A Utah LLC operating an Oregon store would need foreign registration — unclear if this was ever obtained.'
+      ]}
+    ],
+    docs:[
+      {label:'Utah DOC entity lookup — Baker Bricks, LLC #13967677-0160 (confirmed June 2026)', url:null},
+      {label:'Utah DOC filing #2605271017150B — Application for Reinstatement (source needs re-check)', url:null},
+    ]
+  }
+},
+
+{
+  id:'gapquestion', x:2615, y:1381, type:'bomb', tier:1, label:'OPEN: who ran\nthe store Jan–May\n2026?',
+  detail:{
+    title:'Open Question: The Second Gap',
+    subtitle:'January 15/16, 2026 – May 27, 2026 — UPDATED: underlying claim now uncertain',
+    tag:'bomb',
+    sections:[
+      {h:'UPDATE (June 2026)', items:[
+        'This entire gap theory rested on Baker Bricks, LLC having been dissolved Oct 21, 2025 and reinstated May 27, 2026.',
+        'A direct Utah DOC lookup (confirmed June 2026) shows Baker Bricks LLC as Active, formed May 2, 2024, with no dissolution visible on that record — "Status Updated On: May 27, 2026" may just be a routine annual renewal.',
+        'This significantly weakens (though does not fully disprove) the original four-month-gap theory. See the Baker Bricks LLC node for full detail — the dissolution/reinstatement source needs to be re-checked.'
+      ]},
+      {h:'The original mystery (as first framed)', items:[
+        'Salem Baker Bricks Inc. (Oregon) dissolved ~Jan 15–16, 2026.',
+        'It was originally believed Baker Bricks, LLC (Utah) was not reinstated until May 27, 2026, implying neither entity legally existed for about four months.',
+        'The store at 3670 River Rd N, Keizer remained open for business per listings throughout this period regardless.'
+      ]},
+      {h:'Where this leaves us', items:[
+        'If Baker Bricks LLC was continuously active the whole time, the simplest explanation is that the Utah LLC simply continued operating the store after the Oregon entity (Salem Baker Bricks Inc.) dissolved — no real "gap" at all, just a switch in which of the two known entities was the operative one.',
+        'The remaining open question becomes: why did Salem Baker Bricks Inc. exist as a separate Oregon entity at all if Baker Bricks LLC could operate the store directly? And was Baker Bricks LLC ever foreign-registered in Oregon, which it would need to legally operate there?'
+      ]},
+      {h:'Next step', items:[
+        'Re-verify the original source for the Oct 2025 dissolution / May 2026 reinstatement claim.',
+        'Check Oregon SOS for a foreign registration filing by Baker Bricks, LLC (Utah) covering the relevant period.'
+      ]}
+    ],
+    docs:[
+      {label:'Utah DOC entity lookup — Baker Bricks, LLC #13967677-0160 (confirmed June 2026)', url:null},
+      {label:'Oregon SOS — Salem Baker Bricks Inc. dissolution record', url:null},
+      {label:'Oregon SOS — foreign registration search (pending)', url:null},
+    ]
+  }
+},
+{
+  id:'nx2', x:3037, y:1517, type:'sticky', tier:3, label:'Re-check the Oct\n2025 dissolution\nclaim — Utah DOC\nnow shows Active',
+  detail:null
+},
+{
+  id:'nx4', x:3757, y:1034, type:'sticky', tier:3, label:'Still searching for\nthe Keizer entity\n(Nov 24–Mar 25) —\nno rush, ongoing',
+  detail:null
+},
+
+{
+  id:'daniel', x:390, y:331, type:'person', tier:1, label:'Daniel McNeff\nDAD', avatar:'👤',
+  detail:{
+    title:'Daniel J. McNeff ("Dan")',
+    subtitle:'Father of Ammon & Matt McNeff · Founder, Legally Mine',
+    tag:'person',
+    sections:[
+      {h:'Role', items:[
+        'Founder/CEO of Legally Mine LLC, founded ~2007–2009.',
+        'Held 79% ownership of Legally Mine per arbitration exhibits.',
+        'Publicly claimed (Facebook, later deleted) that he was the original CEO of Bricks & Minifigs and that his sons "illegally removed" him.'
+      ]},
+      {h:'The Assignment Email (March 2020)', items:[
+        'Emailed Ammon & Matt instructing them to vacate Legally Mine offices and "focus entirely on BAM Franchising, Inc." while stating "you are not being terminated."',
+        'Arbitrator ruled this was a permissible reassignment, not a termination — but it shows Dan directing both companies as one operation.'
+      ]},
+      {h:'Unauthorized practice of law', items:[
+        'Named personally (alongside Legally Mine LLC) in the Ohio Supreme Court consent decree (Case No. 2025-0037).',
+        'On recorded video: "we, all of the asset protection attorneys at boutique firms throughout the country were all using Nevada [then switched to] Alaska."'
+      ]}
+    ],
+    docs:[
+      {label:'Ohio Supreme Court consent decree, Case No. 2025-0037', url:null},
+      {label:'"Keep What You Earn" presentation video (2022)', url:null},
+      {label:"Dan's deleted Facebook post (archived)", url:null},
+    ]
+  }
+},
+{
+  id:'art', x:739, y:253, type:'fbi', tier:2, label:'Art McComer\nEx-FBI', avatar:'🕵️',
+  detail:{
+    title:'Art McComer',
+    subtitle:'Former FBI Special Agent → Legally Mine "Lead Educator"',
+    tag:'fbi',
+    sections:[
+      {h:'FBI background', items:[
+        'BYU graduate; German studies and education degree; Mormon mission in southern Germany.',
+        'Recruited to FBI for German-language skills; San Diego division; 15-year veteran.'
+      ]},
+      {h:'Legally Mine', items:[
+        'Lead Educator since 2013, presenting at conferences on asset protection and tax reduction.',
+        '2015 Yahoo Finance profile described him as having "dealt with the legal world from the standpoint of an enforcer of the law."'
+      ]},
+      {h:'Fortress Management', items:[
+        'Co-owner with Joshua Johnson.',
+        'As of June 2026, the team page returns 404 and the main site shows only "Coming Soon."'
+      ]}
+    ],
+    docs:[{label:'Yahoo Finance 2015 profile (archived)', url:null}, {label:'Fortress Management Wayback captures', url:null}]
+  }
+},
+{
+  id:'josh', x:479, y:532, type:'person', tier:2, label:'Josh Johnson\nLM alum', avatar:'👤',
+  detail:{
+    title:'Joshua Johnson',
+    subtitle:'Co-owner, Fortress Management · Legally Mine alum',
+    tag:'person',
+    sections:[
+      {h:'Background', items:[
+        'Friend of Ammon McNeff since their 2004 Mormon mission.',
+        'Former employee/presenter for Legally Mine LLC.',
+        'Advertised as "exclusive partner" of "The Fortune Law Firm" — a live poll found ~600 viewers believed this implied he was a lawyer.'
+      ]},
+      {h:'Now formally documented as Baker Bricks LLC member', items:[
+        'Listed at 374 Storrs Ave, American Fork, UT 84003 in the Baker Bricks LLC Utah filing — first formal record of his ownership stake, beyond his own claims to police.'
+      ]}
+    ],
+    docs:[
+      {label:'Baker Bricks LLC Utah filing #2605271017150B', url:null},
+      {label:'Fortress Management Wayback captures', url:null},
+    ]
+  }
+},
+
+{
+  id:'lm', x:1323, y:273, type:'entity', tier:1, label:'Legally Mine\nLLC',
+  detail:{
+    title:'Legally Mine LLC',
+    subtitle:'Orem, Utah',
+    tag:'entity',
+    sections:[
+      {h:'Facts', items:[
+        '~15,000 members; reported $300–400K/month revenue.',
+        'Invited to present at over 250 conference events per year per its own marketing.'
+      ]},
+      {h:'Renamed (bombshell)', items:[
+        'May 21, 2026, 4:49pm — renamed to "LM Old Co," the same day BJC Live Show\'s "Part One" exposé video dropped.',
+        'Possible backdating discrepancy: attestation dated 5/7, actual filing 5/21.'
+      ]},
+      {h:'Litigation', items:[
+        'Eliasieh v. Legally Mine LLC (N.D. Cal., 2018) — settled/dismissed ~2020.',
+        'Ohio State Bar Assn v. Legally Mine LLC — UPL consent decree, naming Dan personally too.',
+        'Simona Marie v. Legally Mine LLC (Dec 2025) — Alaska entity lapse.'
+      ]}
+    ],
+    docs:[
+      {label:'Legally Mine rename filing, 5/21/2026', url:null},
+      {label:'Eliasieh v. Legally Mine — docket', url:null},
+    ]
+  }
+},
+{
+  id:'lmold', x:1168, y:467, type:'bomb', tier:2, label:'LM Old Co\nrenamed',
+  detail:{
+    title:'"LM Old Co" — the rename',
+    subtitle:'Filed May 21, 2026, 4:49pm',
+    tag:'bomb',
+    sections:[{h:'What happened', items:[
+      'Legally Mine LLC renamed to "LM Old Co" at 4:49pm on May 21, 2026 — the exact day BJC Live Show\'s exposé dropped.',
+      'A new "Legally Mine" branded entity appears to have already existed or was being concurrently stood up.',
+      'Possible backdating: attestation dated 5/7, filing dated 5/21.'
+    ]}],
+    docs:[{label:'Utah/relevant state filing — LM Old Co rename', url:null}]
+  }
+},
+{
+  id:'lmtax', x:1480, y:487, type:'bomb', tier:3, label:'LMTA Old Co\nrenamed',
+  detail:{
+    title:'"LMTA Old Co" — Legally Mine Tax & Accounting',
+    subtitle:'Renamed May 21, 2026, 4:49pm',
+    tag:'bomb',
+    sections:[{h:'What happened', items:[
+      'Legally Mine Tax & Accounting LLC renamed at the same moment as the parent company rename.'
+    ]}],
+    docs:[{label:'Filing — LMTA Old Co rename', url:null}]
+  }
+},
+{
+  id:'lmusa', x:1674, y:293, type:'bomb', tier:3, label:'Legally Mine\nUSA (new)',
+  detail:{
+    title:'Legally Mine USA',
+    subtitle:'New entity, formed concurrently with the "Old Co" renames',
+    tag:'bomb',
+    sections:[{h:'What this is', items:[
+      'A newer "Legally Mine" branded entity formed/activated around the same time the original was renamed to "LM Old Co."'
+    ]}],
+    docs:[{label:'Filing — Legally Mine USA formation', url:null}]
+  }
+},
+
+{
+  id:'lmr', x:312, y:799, type:'entity', tier:2, label:'LMR Services\nReg. agent',
+  detail:{
+    title:'LMR Services Inc.',
+    subtitle:'In-house registered agent company',
+    tag:'entity',
+    sections:[{h:'Function', items:[
+      'Registered agent for numerous Legally Mine client entities and Bricks & Minifigs-adjacent companies.',
+      'Used for Bricks & Minifigs Store #51 (Orem, UT — dissolved) and the family limited partnership in the Simona Marie case.'
+    ]}],
+    docs:[{label:'LMR Services Inc. — Utah corporate record', url:null}]
+  }
+},
+{
+  id:'lmralaska', x:662, y:876, type:'entity', tier:2, label:'LMR Services\nAlaska',
+  detail:{
+    title:'LMR Services — Alaska',
+    subtitle:'100% owned by Daniel McNeff',
+    tag:'entity',
+    sections:[{h:'Why Alaska specifically', items:[
+      '100% owned by Daniel McNeff personally.',
+      'Alaska courts cannot force at-will dissolution of an LLC or easily pierce the corporate veil.',
+      'Dan, on tape: "...all of the asset protection attorneys... were all using Nevada [then] they went to Alaska."'
+    ]}],
+    docs:[{label:'Alaska entity registry record', url:null}]
+  }
+},
+{
+  id:'aol', x:253, y:1051, type:'warning', tier:3, label:'Afraid of\nLawsuits LLC',
+  detail:{
+    title:'"Afraid of Lawsuits LLC"',
+    subtitle:'Originally registered agent for My Legal Stronghold LLC',
+    tag:'warning',
+    sections:[{h:'Facts', items:[
+      'On-the-nose name for an entity describing the whole business model.',
+      'Separately referenced in connection with a payment-reroute dispute involving Ammon — needs verification.'
+    ]}],
+    docs:[{label:'Entity registry record', url:null}]
+  }
+},
+{
+  id:'mls', x:527, y:1129, type:'entity', tier:3, label:'My Legal\nStronghold',
+  detail:{
+    title:'My Legal Stronghold LLC',
+    subtitle:'Still active',
+    tag:'entity',
+    sections:[{h:'Facts', items:[
+      'Part of the Legally Mine entity network.',
+      'Currently still listed as active, unlike many recently renamed/dissolved entities.'
+    ]}],
+    docs:[{label:'Entity registry record', url:null}]
+  }
+},
+{
+  id:'veil', x:779, y:1090, type:'entity', tier:3, label:'Veil Corporate\nLLC',
+  detail:{
+    title:'Veil Corporate LLC',
+    subtitle:'D/B/A Veil Solutions LLC',
+    tag:'entity',
+    sections:[{h:'Facts', items:['Another registered-agent-style company within the network.']}],
+    docs:[{label:'Entity registry record', url:null}]
+  }
+},
+{
+  id:'nfap', x:390, y:1323, type:'entity', tier:3, label:'Nat. Foundation\nAsset Protection',
+  detail:{
+    title:'National Foundation for Asset Protection',
+    subtitle:'Nonprofit — Daniel McNeff, CEO',
+    tag:'entity',
+    sections:[{h:'Facts', items:['Structured as a nonprofit, with Daniel McNeff as CEO.']}],
+    docs:[{label:'Nonprofit registry record', url:null}]
+  }
+},
+{
+  id:'medisrc', x:739, y:1363, type:'entity', tier:3, label:'MediSource\nMarketing',
+  detail:{
+    title:'MediSource Marketing',
+    subtitle:'Insurance marketing arm',
+    tag:'entity',
+    sections:[{h:'Open question', items:['Did MediSource sell the life insurance policy referenced in the Simona Marie complaint?']}],
+    docs:[{label:'Entity registry record', url:null}]
+  }
+},
+{
+  id:'centra', x:584, y:1460, type:'entity', tier:3, label:'Centra Wealth\nSolutions',
+  detail:{
+    title:'Centra Wealth Solutions LLC',
+    subtitle:'D/B/A "BAM" — managed by Mark Comer',
+    tag:'entity',
+    sections:[{h:'Facts', items:['Operates under D/B/A "BAM" — relationship to BAM Franchising branding unconfirmed.']}],
+    docs:[{label:'Entity registry record', url:null}]
+  }
+},
+
+{
+  id:'danlm100', x:1168, y:818, type:'confirmed', tier:2, label:'Dan 79% / Ammon\n11% / Matt 10%',
+  detail:{
+    title:'Legally Mine Ownership Split',
+    subtitle:'Per McNeff v. McNeff arbitration exhibits',
+    tag:'confirmed',
+    sections:[{h:'Facts', items:[
+      'Daniel McNeff: 79% ownership.',
+      'Ammon McNeff: 11% (also President, 2011–2020).',
+      'Matt McNeff: 10% (also VP of Marketing, 2011–2020).'
+    ]}],
+    docs:[{label:'McNeff v. McNeff arbitration exhibits', url:null}]
+  }
+},
+{
+  id:'lmowned', x:1517, y:896, type:'bomb', tier:1, label:'LM owned $1M+\nBAM stock',
+  detail:{
+    title:'Legally Mine Held $1M+ in BAM Stock',
+    subtitle:'Per arbitration exhibits',
+    tag:'bomb',
+    sections:[{h:'Why it matters', items:[
+      'Legally Mine LLC held over $1 million in BAM Franchising stock per McNeff v. McNeff arbitration exhibits.',
+      'The two companies were financially fused, not merely connected through shared family ownership.'
+    ]}],
+    docs:[{label:'McNeff v. McNeff arbitration exhibits', url:null}]
+  }
+},
+{
+  id:'assignmt', x:1188, y:1090, type:'bomb', tier:1, label:'THE ASSIGNMENT\nEMAIL',
+  detail:{
+    title:'The Assignment Email',
+    subtitle:'March 2020 — Dan to Ammon & Matt',
+    tag:'bomb',
+    sections:[{h:'What it says', items:[
+      'Dan emailed Ammon and Matt instructing them to vacate Legally Mine offices and "focus entirely on BAM Franchising, Inc." while stating "you are not being terminated."',
+      'Arbitrator ruled this was a permissible reassignment, not wrongful termination — strong evidence Legally Mine and BAM were operationally controlled as one enterprise as of 2020.'
+    ]}],
+    docs:[{label:'The Assignment Email — March 2020', url:null}, {label:'Arbitration ruling', url:null}]
+  }
+},
+{
+  id:'nx3', x:1654, y:1323, type:'sticky', tier:3, label:'Add real document\nlinks + photos as\nyou find them',
+  detail:null
+},
+
+{
+  id:'alaska', x:390, y:1753, type:'bomb', tier:1, label:"Alaska entities\ncan't pierce veil",
+  detail:{
+    title:'Why Alaska',
+    subtitle:'Asset protection jurisdiction of choice',
+    tag:'bomb',
+    sections:[{h:'Facts', items:[
+      'Alaska courts cannot order at-will LLC dissolution or easily pierce the corporate veil.',
+      'Dan, on tape: "...all of the asset protection attorneys at boutique firms throughout the country were all using Nevada... [then] they went to Alaska... your LLC cannot be dissolved by their courts."',
+      'Nevada previously offered similar protection but passed a law allowing at-will judicial dissolution, prompting the shift to Alaska.'
+    ]}],
+    docs:[{label:'"Keep What You Earn" presentation video (2022)', url:null}]
+  }
+},
+{
+  id:'dapt', x:818, y:1713, type:'warning', tier:3, label:'DAPT trusts',
+  detail:{
+    title:'Domestic Asset Protection Trusts (DAPTs)',
+    subtitle:'Irrevocable, self-settled trusts',
+    tag:'warning',
+    sections:[{h:'Facts', items:[
+      'Part of the broader toolkit marketed and used within this network.',
+      'Irrevocable, self-settled trusts intended to place assets beyond the reach of creditors or judgments.'
+    ]}],
+    docs:[{label:'Trust filing record', url:null}]
+  }
+},
+{
+  id:'greendrg', x:1207, y:1791, type:'warning', tier:3, label:'Green Dragon\nLayer LLC',
+  detail:{
+    title:'Green Dragon Layer LLC',
+    subtitle:'Real estate entity',
+    tag:'warning',
+    sections:[{h:'Facts', items:['A real estate-focused LLC within the network. Specific holdings not yet fully documented.']}],
+    docs:[{label:'Entity registry record', url:null}]
+  }
+},
+{
+  id:'holdings', x:1517, y:1713, type:'entity', tier:3, label:'MSC Holdings\nLLC',
+  detail:{
+    title:'MSC Holdings LLC',
+    subtitle:'Property holding company',
+    tag:'entity',
+    sections:[{h:'Facts', items:['A property-holding LLC within the broader network.']}],
+    docs:[{label:'Entity registry record', url:null}]
+  }
+},
+
+];
+
+const EDGES = [
+  ['ammon','center','strong'],['matt','center','strong'],
+  ['reed','center','normal'],['darin','center','normal'],['mikewu','center','normal'],
+  ['notdan','ammon','bomb'],['notdan','matt','bomb'],
+  ['fdd','center','strong'],['waag','fdd','warn'],['settlement18k','fdd','bomb'],
+  ['oregonold','center','warn'],['oregonold','defind','warn'],
+  ['defind','center','keyfind'],['defind','nx1','keyfind'],
+  ['willamette','center','bomb'],['willamette','matt','bomb'],
+  ['baker_inc','willamette','replacement'],
+  ['baker_llc','josh','normal'],['baker_llc','center','warn'],
+  ['brandon','baker_inc','strong'],['brandon','baker_llc','strong'],['brandon','josh','normal'],
+  ['brandon','fddgap','bomb'],['brandon','fdd','warn'],
+  ['gapquestion','baker_inc','bomb'],['gapquestion','baker_llc','bomb'],['gapquestion','nx2','bomb'],
+  ['gapquestion','fdd','bomb'],
+  ['fddgap','fdd','bomb'],['fddgap','baker_inc','bomb'],['fddgap','baker_llc','bomb'],
+  ['fddgap','josh','bomb'],['fddgap','gapquestion','bomb'],['fddgap','center','bomb'],['fddgap','nx4','bomb'],
+
+  ['daniel','ammon','normal'],['daniel','matt','normal'],
+  ['daniel','lm','strong'],['ammon','lm','warn'],['matt','lm','warn'],
+  ['lm','lmold','bomb'],['lm','lmtax','bomb'],['lmusa','lm','bomb'],
+  ['lm','lmr','normal'],['lmr','lmralaska','normal'],
+  ['lm','aol','normal'],['lm','mls','normal'],['lm','veil','normal'],
+  ['lm','nfap','normal'],['lm','medisrc','normal'],['lm','centra','normal'],
+  ['daniel','danlm100','confirm'],['lm','lmowned','bomb'],['lmowned','center','bomb'],
+  ['assignmt','lm','bomb'],['assignmt','center','bomb'],
+  ['daniel','alaska','bomb'],['lmralaska','alaska','bomb'],
+  ['alaska','dapt','warn'],['alaska','greendrg','warn'],['alaska','holdings','normal'],
+  ['art','lm','fbi'],['josh','lm','fbi'],['art','josh','fbi'],
+  ['josh','baker_llc','normal'],
+  ['lm','notdan','bomb'],
+];
+
+</script>
+<script>
+// ============================================================
+// BAM INVESTIGATION — APP ENGINE
+// zones + clusters + tiers + avatars + docs + EDIT MODE
+// ============================================================
+
+const STORAGE_KEY = 'bamwall_corporate_legallymine_v1';
+
+// ============================================================
+// SERVER SYNC (optional) — if you've set up the persistence
+// server, settings save there too, in addition to localStorage.
+// localStorage always stays as an instant local cache/fallback,
+// so the wall keeps working even if the server is offline.
+//
+// To enable: set SERVER_URL below to your server's address,
+// e.g. 'https://yourdomain.com' or 'http://your-server-ip:3939'.
+// Leave it as null to use localStorage only (original behavior).
+// ============================================================
+const SERVER_URL = 'https://wall-settings-server.onrender.com'; // your live persistence server
+
+const SERVER_KEY_MAP = {
+  [STORAGE_KEY]: 'node_overrides',
+  // the color/panel storage keys are defined further below in this file;
+  // their server key mappings are added at the bottom of this section
+  // once those constants exist (see syncRegisterKey calls near each).
+};
+
+let wallPassword = null; // held in memory only for this session, never persisted
+let serverSyncStatus = 'idle'; // 'idle' | 'syncing' | 'ok' | 'error' | 'offline'
+
+function getWallPassword(){
+  if(wallPassword) return wallPassword;
+  wallPassword = sessionStorage.getItem('bamwall_session_password') || null;
+  return wallPassword;
+}
+
+function setWallPassword(pw){
+  wallPassword = pw;
+  try{ sessionStorage.setItem('bamwall_session_password', pw); }catch(e){}
+}
+
+function promptForPassword(){
+  const pw = prompt('Enter the wall password to save/sync to the server:');
+  if(pw){ setWallPassword(pw); }
+  return pw;
+}
+
+function updateSyncIndicator(status){
+  serverSyncStatus = status;
+  const el = document.getElementById('syncIndicator');
+  if(!el) return;
+  const map = {
+    idle:    {text:'', show:false},
+    syncing: {text:'\u21bb Syncing\u2026', show:true},
+    ok:      {text:'\u2713 Synced', show:true},
+    error:   {text:'\u26a0 Sync failed \u2014 saved locally only', show:true},
+    offline: {text:'Server sync off', show:false},
+  };
+  const s = map[status] || map.idle;
+  el.textContent = s.text;
+  el.style.display = s.show ? 'inline-block' : 'none';
+}
+
+// Save a value to the server. Fails silently into local-only mode if
+// SERVER_URL isn't set, the server is unreachable, or the password is wrong
+// — localStorage has already been written by the caller before this runs,
+// so nothing is lost even if this fails.
+async function syncSaveToServer(serverKey, value){
+  if(!SERVER_URL){ updateSyncIndicator('offline'); return; }
+  let pw = getWallPassword();
+  if(!pw){ pw = promptForPassword(); if(!pw) { updateSyncIndicator('error'); return; } }
+
+  updateSyncIndicator('syncing');
+  try{
+    const res = await fetch(SERVER_URL + '/api/wall/' + serverKey, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Wall-Password': pw },
+      body: JSON.stringify({ value }),
+    });
+    if(res.status === 401){
+      wallPassword = null;
+      try{ sessionStorage.removeItem('bamwall_session_password'); }catch(e){}
+      alert('That password was rejected by the server. Please try saving again with the correct password.');
+      updateSyncIndicator('error');
+      return;
+    }
+    if(!res.ok){ updateSyncIndicator('error'); return; }
+    updateSyncIndicator('ok');
+  }catch(e){
+    console.warn('Server sync failed, your change is still saved locally in this browser:', e);
+    updateSyncIndicator('error');
+  }
+}
+
+// Load a value from the server. Returns null if unavailable for any
+// reason (server not configured, unreachable, no value saved yet) so
+// the caller can fall back to localStorage / defaults.
+async function syncLoadFromServer(serverKey){
+  if(!SERVER_URL) return null;
+  try{
+    const res = await fetch(SERVER_URL + '/api/wall/' + serverKey);
+    if(!res.ok) return null; // covers 404 (nothing saved yet) and any other error
+    const data = await res.json();
+    if(typeof data.value !== 'string') return null;
+    try{
+      return JSON.parse(data.value); // the server stores/returns values as JSON-encoded strings
+    }catch(parseErr){
+      console.warn('Server returned a value that was not valid JSON for key', serverKey, parseErr);
+      return null;
+    }
+  }catch(e){
+    console.warn('Could not reach the persistence server, using local data instead:', e);
+    return null;
+  }
+}
+
+const viewport = document.getElementById('viewport');
+const world = document.getElementById('world');
+const svg = document.getElementById('lines');
+
+let scale = 0.62;
+let originX = -60, originY = -40;
+let panning = false, panStartX=0, panStartY=0, originStartX=0, originStartY=0;
+let editMode = false;
+
+// ============================================================
+// PERSISTENCE (localStorage) — merges saved overrides into NODES
+// ============================================================
+function loadOverrides(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return {};
+    return JSON.parse(raw);
+  }catch(e){ console.warn('Could not load saved edits', e); return {}; }
+}
+function saveOverrides(overrides){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
+  }catch(e){ console.warn('Could not save edits', e); }
+  syncSaveToServer('node_overrides', Object.assign({}, overrides, {_zoneData: buildZonePayload()}));
+}
+let overrides = loadOverrides(); // { nodeId: { x, y, label, avatar, detail:{...} } }
+
+// Called once after the wall has already rendered locally. If a server is
+// configured and reachable, and has saved data, this re-applies it on top
+// of whatever loaded from localStorage — so a different browser/device
+// picks up your latest saved state instead of starting from scratch.
+async function refreshOverridesFromServer(){
+  const serverValue = await syncLoadFromServer('node_overrides');
+  if(!serverValue) return;
+  if(serverValue._zoneData){
+    applyServerZoneData(serverValue._zoneData);
+    delete serverValue._zoneData;
+  }
+  overrides = serverValue;
+  saveOverridesLocalOnly(overrides); // cache it locally too, without re-triggering a server save
+  applyOverridesToNodes();
+  // re-render everything in place with the refreshed data
+  Object.keys(nodeElMap).forEach(id=>{
+    const n = nodeMap[id];
+    const el = nodeElMap[id];
+    if(n && el){ positionNodeEl(el, n); }
+  });
+}
+function saveOverridesLocalOnly(overrides){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides)); }catch(e){}
+}
+
+function applyOverridesToNodes(){
+  NODES.forEach(n=>{
+    const o = overrides[n.id];
+    if(!o) return;
+    if(typeof o.x === 'number') n.x = o.x;
+    if(typeof o.y === 'number') n.y = o.y;
+    if(typeof o.label === 'string') n.label = o.label;
+    if(typeof o.avatar === 'string') n.avatar = o.avatar;
+    if(o.detail) n.detail = JSON.parse(JSON.stringify(o.detail)); // deep copy
+  });
+}
+
+function persistNode(n){
+  if(!overrides[n.id]) overrides[n.id] = {};
+  overrides[n.id].x = n.x;
+  overrides[n.id].y = n.y;
+  overrides[n.id].label = n.label;
+  if(n.avatar) overrides[n.id].avatar = n.avatar;
+  if(n.detail) overrides[n.id].detail = JSON.parse(JSON.stringify(n.detail));
+  saveOverrides(overrides);
+}
+
+function resetAllEdits(){
+  if(!confirm('This will erase every edit you have made in this browser (positions, text, docs, photos) and restore the original wall. This cannot be undone. Continue?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
+}
+
+// ============================================================
+// EXPORT READ-ONLY VERSION (bakes current edits into a static file)
+// ============================================================
+function exportReadOnly(){
+  if(!confirm('This will generate a new HTML file with your current layout, colors, sizes, and photos baked in \u2014 with all editing tools removed. The file will download to your computer. Continue?')) return;
+
+  const escAttr = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const escHtml = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // Build static CSS for node colors/sizes/fonts from currentColors
+  let nodeCss = '';
+  Object.keys(currentColors).forEach(type=>{
+    if(type === '_background') return;
+    const c = currentColors[type];
+    const fillA = c.fillA!==undefined?c.fillA:1, borderA = c.borderA!==undefined?c.borderA:1;
+    nodeCss += `.node.${type} { background:hsla(${c.fillH},${c.fillS}%,${c.fillL}%,${fillA}); `+
+               `border-color:hsla(${c.borderH},${c.borderS}%,${c.borderL}%,${borderA}); `+
+               `color:hsl(${c.textH},${c.textS}%,${c.textL}%); `+
+               `font-size:${c.fontSize}px; line-height:${c.lineHeight}; font-weight:${c.fontWeight}; }\n`;
+  });
+  const bg = currentColors._background;
+  const bgCss = bg ? `body, .viewport { background:hsl(${bg.h},${bg.s}%,${bg.l}%); }` : '';
+
+  let panelCss = '';
+  Object.keys(currentPanels).forEach(key=>{
+    const p = currentPanels[key];
+    const sel = PANEL_SELECTORS[key];
+    if(!sel) return;
+    panelCss += `${sel} { background:hsla(${p.h},${p.s}%,${p.l}%,${p.a}); border-radius:${p.radius}px; `+
+                (p.width ? `width:${p.width}px; max-width:94vw;` : '') + ` }\n`;
+  });
+
+  // Snapshot current node/edge/zone/cluster state exactly as it is right now in memory
+  const nodesSnapshot = JSON.stringify(NODES);
+  const edgesSnapshot = JSON.stringify(EDGES);
+  const zonesSnapshot = JSON.stringify(ZONES);
+  const clustersSnapshot = JSON.stringify(typeof CLUSTERS !== 'undefined' ? CLUSTERS : []);
+
+  function sizeForStatic(type, tier, colorsObj){
+    let base;
+    switch(type){
+      case 'center': base = 256; break;
+      case 'sticky': base = 220; break;
+      case 'branch': base = 180; break;
+      case 'bomb': base = 170; break;
+      case 'person': case 'fbi': base = 176; break;
+      case 'keyfind': base = 180; break;
+      case 'replacement': base = 170; break;
+      default: base = 152;
+    }
+    const mult = (type==='center'||type==='sticky') ? 1.0 : (tier===1 ? 1.4 : tier===3 ? 0.72 : 1.0);
+    const scale = (colorsObj[type] && colorsObj[type].sizeScale) || 1.0;
+    return Math.round(base*mult*scale);
+  }
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BAM Investigation \u2014 Corporate Structure &amp; Legally Mine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,400..1000&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Google Sans Flex', -apple-system, BlinkMacSystemFont, sans-serif; }
+${bgCss}
+.viewport { width: 100vw; height: 100vh; position: relative; overflow: hidden; cursor: grab; }
+.viewport.panning { cursor: grabbing; }
+.world { position: absolute; top: 0; left: 0; transform-origin: 0 0; width: 5000px; height: 2550px; }
+svg.lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible; }
+.zone { position: absolute; border-radius: 32px; z-index: 0; }
+.zone .zone-label { position: absolute; top: 18px; left: 28px; font-size: 15px; font-weight: 700; }
+.zone .zone-sublabel { position: absolute; top: 40px; left: 28px; font-size: 10.5px; opacity: .75; }
+.cluster { position: absolute; border-radius: 20px; z-index: 0; pointer-events: none; }
+.cluster .cluster-label { position: absolute; top: 8px; left: 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; opacity: .8; }
+.node {
+  position: absolute; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; cursor: pointer; user-select: none; padding: 11px; word-break: break-word; border-radius: 50%;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.18); border-width: 9px; border-style: solid;
+}
+.node.sticky { border-radius:10px; cursor:default; width:200px; height:auto; min-height:64px; padding:14px 17px; border-width:4px; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.55); border: 2px solid rgba(0,0,0,0.15); font-size: 20px; }
+.avatar img { width:100%; height:100%; border-radius:50%; object-fit:cover; }
+${nodeCss}
+line.web-line { stroke:#ccc; stroke-width:1.2px; }
+line.web-line.strong { stroke:#999; stroke-width:2.2px; }
+line.web-line.confirm { stroke:#3b6d11; stroke-width:1.8px; }
+line.web-line.warn { stroke:#854f0b; stroke-width:1.2px; stroke-dasharray:5 3; }
+line.web-line.danger { stroke:#e06060; stroke-width:1.2px; stroke-dasharray:5 3; }
+line.web-line.keyfind { stroke:#7ab44a; stroke-width:3px; }
+line.web-line.fbi { stroke:#4488ff; stroke-width:1.8px; }
+line.web-line.bomb { stroke:#ff4444; stroke-width:1.8px; stroke-dasharray:6 2; }
+line.web-line.replacement { stroke:#ff9933; stroke-width:2px; stroke-dasharray:2 2; }
+#controls { position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:300; display:flex; gap:6px; align-items:center; border:1px solid #ddd; border-radius:10px; padding:7px 10px; box-shadow:0 2px 10px rgba(0,0,0,0.12); }
+#controls button { font-size:11px; padding:5px 11px; border:1px solid #ccc; border-radius:6px; background:#fff; cursor:pointer; }
+#zoomLabel { font-size:11px; color:#888; min-width:42px; text-align:center; }
+#legend { position:fixed; bottom:14px; left:14px; z-index:300; border:1px solid #ddd; padding:10px 14px; font-size:10px; line-height:1.9; max-height:50vh; overflow-y:auto; }
+#legend div { display:flex; align-items:center; gap:7px; }
+.dot { width:13px; height:13px; border-radius:50%; flex-shrink:0; }
+#detailOverlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(20,18,14,0.45); z-index:400; display:none; align-items:center; justify-content:flex-end; }
+#detailPanel { width:440px; max-width:92vw; height:100%; box-shadow:-6px 0 24px rgba(0,0,0,0.25); padding:28px 26px; overflow-y:auto; font-size:13.5px; line-height:1.6; position:relative; }
+#detailPanel .closeBtn { position:absolute; top:20px; right:20px; background:none; border:none; font-size:22px; color:#999; cursor:pointer; }
+#detailPanel h2 { font-size:18px; line-height:1.3; }
+#detailPanel .subtitle { font-size:11.5px; opacity:.7; margin-bottom:16px; text-transform:uppercase; }
+#detailPanel section { margin-bottom:18px; }
+#detailPanel section h3 { font-size:11.5px; text-transform:uppercase; opacity:.6; margin-bottom:6px; }
+#detailPanel ul { padding-left:18px; margin-top:4px; }
+#detailPanel li { margin-bottom:5px; }
+#detailPanel .docItem { display:flex; gap:8px; padding:8px 10px; margin-bottom:6px; border-radius:8px; background:rgba(0,0,0,0.04); font-size:12.5px; }
+#detailPanel .docItem a { color:#1a5a8a; }
+${panelCss}
+</style>
+</head>
+<body>
+<div class="viewport" id="viewport">
+  <div class="world" id="world">
+    <svg class="lines" id="lines"></svg>
+  </div>
+</div>
+<div id="controls">
+  <button onclick="zoomBy(1.2)">+ Zoom in</button>
+  <span id="zoomLabel">100%</span>
+  <button onclick="zoomBy(0.83)">\u2212 Zoom out</button>
+  <button onclick="resetView()">Reset view</button>
+  <button onclick="fitAll()">Fit all</button>
+</div>
+<div id="legend">
+  <div style="font-style:italic;opacity:.7;">Click any circle for full details</div>
+  <div style="font-style:italic;opacity:.6;margin-top:4px;">Drag to pan \u00b7 Scroll to zoom</div>
+</div>
+<div id="detailOverlay" onclick="if(event.target===this)closeDetail()">
+  <div id="detailPanel"><button class="closeBtn" onclick="closeDetail()">&times;</button><div id="detailContent"></div></div>
+</div>
+<script>
+const NODES = ${nodesSnapshot};
+const EDGES = ${edgesSnapshot};
+const ZONES = ${zonesSnapshot};
+const CLUSTERS = ${clustersSnapshot};
+const viewport = document.getElementById('viewport');
+const world = document.getElementById('world');
+const svg = document.getElementById('lines');
+let scale = 0.5, originX = 0, originY = 0, panning=false, panStartX=0, panStartY=0, originStartX=0, originStartY=0;
+function applyTransform(){ world.style.transform = 'translate('+(-originX*scale)+'px,'+(-originY*scale)+'px) scale('+scale+')'; document.getElementById('zoomLabel').textContent = Math.round(scale*100)+'%'; }
+function zoomBy(f,cx,cy){ const vw=viewport.clientWidth, vh=viewport.clientHeight; if(cx===undefined)cx=vw/2; if(cy===undefined)cy=vh/2; const wx=originX+cx/scale, wy=originY+cy/scale; scale=Math.min(2.2,Math.max(0.15,scale*f)); originX=wx-cx/scale; originY=wy-cy/scale; applyTransform(); }
+function resetView(){ scale=0.5; originX=0; originY=0; applyTransform(); }
+function fitAll(){
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  NODES.forEach(n=>{ minX=Math.min(minX,n.x-150); maxX=Math.max(maxX,n.x+150); minY=Math.min(minY,n.y-150); maxY=Math.max(maxY,n.y+150); });
+  ZONES.forEach(z=>{ minX=Math.min(minX,z.x-20); maxX=Math.max(maxX,z.x+z.w+20); minY=Math.min(minY,z.y-20); maxY=Math.max(maxY,z.y+z.h+20); });
+  const vw=viewport.clientWidth, vh=viewport.clientHeight, ww=maxX-minX, wh=maxY-minY;
+  scale=Math.max(Math.min(vw/ww, vh/wh, 1.3), 0.12);
+  originX = minX - (vw/scale-ww)/2; originY = minY - (vh/scale-wh)/2;
+  applyTransform();
+}
+viewport.addEventListener('mousedown', e=>{ panning=true; panStartX=e.clientX; panStartY=e.clientY; originStartX=originX; originStartY=originY; });
+window.addEventListener('mousemove', e=>{ if(!panning)return; originX=originStartX-(e.clientX-panStartX)/scale; originY=originStartY-(e.clientY-panStartY)/scale; applyTransform(); });
+window.addEventListener('mouseup', ()=>{ panning=false; });
+viewport.addEventListener('wheel', e=>{ e.preventDefault(); const r=viewport.getBoundingClientRect(); zoomBy(e.deltaY<0?1.1:0.91, e.clientX-r.left, e.clientY-r.top); }, {passive:false});
+function sizeFor(type, tier){
+  let base; switch(type){ case 'center': return 256; case 'sticky': return 220; case 'branch': base=180; break; case 'bomb': base=170; break; case 'person': case 'fbi': base=176; break; case 'keyfind': base=180; break; case 'replacement': base=170; break; default: base=152; }
+  const mult = tier===1?1.4:tier===3?0.72:1.0; return Math.round(base*mult);
+}
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+const nodeMap = {};
+ZONES.forEach(z=>{ const el=document.createElement('div'); el.className='zone'; el.style.left=z.x+'px'; el.style.top=z.y+'px'; el.style.width=z.w+'px'; el.style.height=z.h+'px'; el.style.background='rgba(255,255,255,0.04)'; const l=document.createElement('div'); l.className='zone-label'; l.textContent=z.label; el.appendChild(l); world.insertBefore(el, svg); });
+(CLUSTERS||[]).forEach(c=>{ const el=document.createElement('div'); el.className='cluster'; el.style.left=c.x+'px'; el.style.top=c.y+'px'; el.style.width=c.w+'px'; el.style.height=c.h+'px'; world.insertBefore(el, svg); });
+NODES.forEach(n=>{
+  const el=document.createElement('div'); el.className='node '+n.type;
+  const w=sizeFor(n.type,n.tier); el.style.left=(n.x-w/2)+'px'; el.style.top=(n.y-w/2)+'px'; el.style.width=w+'px'; if(n.type!=='sticky') el.style.height=w+'px';
+  if(n.avatar){ const av=document.createElement('div'); av.className='avatar'; if(/^(https?:|data:image)/.test(n.avatar)){ const img=document.createElement('img'); img.src=n.avatar; av.appendChild(img); } else { av.textContent=n.avatar; } el.appendChild(av); }
+  const span=document.createElement('span'); span.innerHTML=escapeHtml(n.label).replace(/\\n/g,'<br>'); el.appendChild(span);
+  if(n.detail){ el.addEventListener('click', ()=>openDetail(n)); }
+  world.appendChild(el); nodeMap[n.id]=n;
+});
+EDGES.forEach(([f,t,type])=>{ const a=nodeMap[f], b=nodeMap[t]; if(!a||!b) return; const line=document.createElementNS('http://www.w3.org/2000/svg','line'); line.setAttribute('x1',a.x); line.setAttribute('y1',a.y); line.setAttribute('x2',b.x); line.setAttribute('y2',b.y); line.setAttribute('class','web-line'+(type&&type!=='normal'?' '+type:'')); svg.appendChild(line); });
+function openDetail(n){
+  const d=n.detail; let html='<h2>'+escapeHtml(d.title)+'</h2>';
+  if(d.subtitle) html+='<div class="subtitle">'+escapeHtml(d.subtitle)+'</div>';
+  (d.sections||[]).forEach(sec=>{ html+='<section><h3>'+escapeHtml(sec.h)+'</h3><ul>'; (sec.items||[]).forEach(i=>html+='<li>'+escapeHtml(i)+'</li>'); html+='</ul></section>'; });
+  if(d.docs && d.docs.length){ html+='<section><h3>Supporting documents &amp; links</h3>'; d.docs.forEach(doc=>{ html += doc.url ? '<div class="docItem"><a href="'+doc.url+'" target="_blank">'+escapeHtml(doc.label)+'</a></div>' : '<div class="docItem" style="opacity:.5;">'+escapeHtml(doc.label)+'</div>'; }); html+='</section>'; }
+  document.getElementById('detailContent').innerHTML = html;
+  document.getElementById('detailOverlay').style.display = 'flex';
+}
+function closeDetail(){ document.getElementById('detailOverlay').style.display = 'none'; }
+applyTransform();
+setTimeout(fitAll, 50);
+<\/script>
+</body>
+</html>`;
+
+  const blob = new Blob([html], {type: 'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bam_wall_published_' + new Date().toISOString().slice(0,10) + '.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// PER-TYPE COLOR SYSTEM (editable via the Colors panel)
+// ============================================================
+const COLOR_STORAGE_KEY = 'bamwall_colors_v1';
+
+const TYPE_LABELS = {
+  center:'Center (BAM Franchising Inc.)', bomb:'Bombshell', keyfind:'Key finding',
+  entity:'Entity', person:'Person', fbi:'FBI-connected', confirmed:'Confirmed',
+  warning:'Warning', danger:'Open question', dissolved:'Dissolved',
+  replacement:'Replacement entity', branch:'Document / topic'
+};
+
+// Each type stores fill (h,s,l) and border (h,s,l) independently so you can
+// push the border far from the fill for contrast, or match them, your choice.
+// '_background' is a special key controlling the canvas color itself.
+const DEFAULT_COLORS = {
+  _background: { h:280, s:14, l:13 },  // the deep plum-charcoal default
+  center:      { fillH:0,   fillS:0,  fillL:16, borderH:0,   borderS:0,  borderL:62, textH:0,   textS:0,   textL:100, sizeScale:1.0, fontSize:19, lineHeight:1.24, fontWeight:800, fillA:1, borderA:1 },
+  bomb:        { fillH:350, fillS:82, fillL:14, borderH:350, borderS:82, borderL:62, textH:0,   textS:100, textL:93,  sizeScale:1.0, fontSize:19, lineHeight:1.24, fontWeight:800, fillA:1, borderA:1 },
+  keyfind:     { fillH:165, fillS:70, fillL:16, borderH:165, borderS:70, borderL:64, textH:155, textS:61,  textL:90,  sizeScale:1.0, fontSize:19, lineHeight:1.24, fontWeight:800, fillA:1, borderA:1 },
+  fbi:         { fillH:230, fillS:62, fillL:15, borderH:230, borderS:62, borderL:60, textH:220, textS:100, textL:92,  sizeScale:1.0, fontSize:19, lineHeight:1.24, fontWeight:800, fillA:1, borderA:1 },
+  replacement: { fillH:22,  fillS:85, fillL:17, borderH:22,  borderS:85, borderL:64, textH:31,  textS:100, textL:88,  sizeScale:1.0, fontSize:19, lineHeight:1.24, fontWeight:800, fillA:1, borderA:1 },
+  entity:      { fillH:210, fillS:62, fillL:91, borderH:210, borderS:62, borderL:38, textH:208, textS:86,  textL:16,  sizeScale:1.0, fontSize:19, lineHeight:1.24, fontWeight:800, fillA:1, borderA:1 },
+  person:      { fillH:275, fillS:50, fillL:91, borderH:275, borderS:50, borderL:38, textH:268, textS:67,  textL:18,  sizeScale:1.0, fontSize:19, lineHeight:1.24, fontWeight:800, fillA:1, borderA:1 },
+  confirmed:   { fillH:135, fillS:45, fillL:90, borderH:135, borderS:45, borderL:30, textH:108, textS:81,  textL:13,  sizeScale:1.0, fontSize:19, lineHeight:1.24, fontWeight:800, fillA:1, borderA:1 },
+  warning:     { fillH:42,  fillS:85, fillL:89, borderH:42,  borderS:85, borderL:38, textH:37,  textS:100, textL:11,  sizeScale:1.0, fontSize:19, lineHeight:1.24, fontWeight:800, fillA:1, borderA:1 },
+  danger:      { fillH:8,   fillS:65, fillL:91, borderH:8,   borderS:65, borderL:40, textH:0,   textS:80,  textL:16,  sizeScale:1.0, fontSize:19, lineHeight:1.24, fontWeight:800, fillA:1, borderA:1 },
+  branch:      { fillH:33,  fillS:38, fillL:93, borderH:33,  borderS:45, borderL:36, textH:38,  textS:70,  textL:11,  sizeScale:1.0, fontSize:19, lineHeight:1.24, fontWeight:800, fillA:1, borderA:1 },
+  dissolved:   { fillH:0,   fillS:0,  fillL:85, borderH:0,   borderS:0,  borderL:38, textH:0,   textS:0,   textL:17,  sizeScale:1.0, fontSize:19, lineHeight:1.24, fontWeight:800, fillA:1, borderA:1 },
+};
+
+// ============================================================
+// FLOATING PANEL STYLE SYSTEM (legend, controls, detail/edit/style panels)
+// ============================================================
+const PANEL_STORAGE_KEY = 'bamwall_panels_v1';
+
+const PANEL_SELECTORS = {
+  legend:      '#legend',
+  controls:    '#controls',
+  detailPanel: '#detailPanel',
+  editForm:    '#editForm',
+  colorPanel:  '#colorPanel',
+};
+const PANEL_LABELS = {
+  legend:      'Legend (bottom left)',
+  controls:    'Controls bar (top)',
+  detailPanel: 'Detail panel (view mode)',
+  editForm:    'Edit form (edit mode)',
+  colorPanel:  'Style panel (this panel)',
+};
+// h/s/l = warm off-white default for all panels, matching the original paper-like look
+const DEFAULT_PANELS = {
+  legend:      { h:42, s:38, l:97, a:0.97, radius:8 },
+  controls:    { h:42, s:38, l:97, a:0.97, radius:10 },
+  detailPanel: { h:40, s:50, l:98, a:1.0,  radius:0, width:440, height:0 }, // height:0 = full viewport height (its normal behavior)
+  editForm:    { h:40, s:50, l:98, a:1.0,  radius:12, width:480, height:0 }, // height:0 = auto/content-based
+  colorPanel:  { h:40, s:50, l:98, a:1.0,  radius:12, width:780, height:0 },
+};
+
+function loadPanels(){
+  try{
+    const raw = localStorage.getItem(PANEL_STORAGE_KEY);
+    if(!raw) return JSON.parse(JSON.stringify(DEFAULT_PANELS));
+    const saved = JSON.parse(raw);
+    const merged = JSON.parse(JSON.stringify(DEFAULT_PANELS));
+    Object.keys(saved).forEach(k=>{ if(merged[k]) Object.assign(merged[k], saved[k]); });
+    return merged;
+  }catch(e){ return JSON.parse(JSON.stringify(DEFAULT_PANELS)); }
+}
+function savePanels(panels){
+  try{ localStorage.setItem(PANEL_STORAGE_KEY, JSON.stringify(panels)); }
+  catch(e){ console.warn('Could not save panel styles', e); }
+  syncSaveToServer('panel_styles', panels);
+}
+let currentPanels = loadPanels();
+
+function loadColors(){
+  try{
+    const raw = localStorage.getItem(COLOR_STORAGE_KEY);
+    if(!raw) return JSON.parse(JSON.stringify(DEFAULT_COLORS));
+    const saved = JSON.parse(raw);
+    const merged = JSON.parse(JSON.stringify(DEFAULT_COLORS));
+    Object.keys(saved).forEach(k=>{ if(merged[k]) Object.assign(merged[k], saved[k]); });
+    return merged;
+  }catch(e){ return JSON.parse(JSON.stringify(DEFAULT_COLORS)); }
+}
+function saveColors(colors){
+  try{ localStorage.setItem(COLOR_STORAGE_KEY, JSON.stringify(colors)); }
+  catch(e){ console.warn('Could not save colors', e); }
+  syncSaveToServer('node_colors', colors);
+}
+let currentColors = loadColors();
+
+async function refreshColorsAndPanelsFromServer(){
+  const serverColors = await syncLoadFromServer('node_colors');
+  // Validate — must have _background.h to be a real colors object
+  if(serverColors && serverColors._background && typeof serverColors._background.h === 'number'){
+    currentColors = serverColors;
+    try{ localStorage.setItem(COLOR_STORAGE_KEY, JSON.stringify(currentColors)); }catch(e){}
+  }
+  const serverPanels = await syncLoadFromServer('panel_styles');
+  // Validate — must have at least a legend key
+  if(serverPanels && serverPanels.legend && typeof serverPanels.legend.h === 'number'){
+    currentPanels = serverPanels;
+    try{ localStorage.setItem(PANEL_STORAGE_KEY, JSON.stringify(currentPanels)); }catch(e){}
+  }
+  if(serverColors || serverPanels){
+    applyColorStyles();
+    Object.keys(TYPE_LABELS).forEach(type=>resizeAllNodesOfType(type));
+  }
+}
+
+function applyColorStyles(){
+  let css = '';
+  Object.keys(currentColors).forEach(type=>{
+    if(type === '_background') return;
+    const c = currentColors[type];
+    const fillA = c.fillA !== undefined ? c.fillA : 1;
+    const borderA = c.borderA !== undefined ? c.borderA : 1;
+    css += `.node.${type} { background:hsla(${c.fillH},${c.fillS}%,${c.fillL}%,${fillA}) !important; `+
+           `border-color:hsla(${c.borderH},${c.borderS}%,${c.borderL}%,${borderA}) !important; `+
+           `color:hsl(${c.textH},${c.textS}%,${c.textL}%) !important; `+
+           `font-size:${c.fontSize}px !important; line-height:${c.lineHeight} !important; `+
+           `font-weight:${c.fontWeight} !important; }\n`;
+  });
+
+  const bg = currentColors._background;
+  if(bg){
+    const bgColor = `hsl(${bg.h},${bg.s}%,${bg.l}%)`;
+    css += `body, #viewport { background:${bgColor} !important; }\n`;
+  }
+
+  applyPanelStyles(css);
+}
+
+let hiddenPanels = {}; // session-only, NOT persisted — resets on reload, by design
+
+function applyPanelStyles(css){
+  css = css || '';
+  Object.keys(currentPanels).forEach(key=>{
+    const p = currentPanels[key];
+    const sel = PANEL_SELECTORS[key];
+    if(!sel) return;
+    if(hiddenPanels[key]){
+      css += `${sel} { display:none !important; }\n`;
+      return;
+    }
+    css += `${sel} { background:hsla(${p.h},${p.s}%,${p.l}%,${p.a}) !important; `+
+           `border-radius:${p.radius}px !important; }\n`;
+    if(p.width){
+      css += `${sel} { width:${p.width}px !important; max-width:94vw !important; }\n`;
+    }
+    if(p.height){
+      css += `${sel} { height:${p.height}px !important; max-height:90vh !important; }\n`;
+    }
+  });
+
+  let styleEl = document.getElementById('dynamicColorStyles');
+  if(!styleEl){
+    styleEl = document.createElement('style');
+    styleEl.id = 'dynamicColorStyles';
+    document.head.appendChild(styleEl);
+  }
+  styleEl.textContent = css;
+}
+
+function openColorPanel(){
+  renderColorPanel();
+  document.getElementById('colorPanelOverlay').style.display = 'flex';
+}
+function closeColorPanel(){
+  document.getElementById('colorPanelOverlay').style.display = 'none';
+}
+
+function hsl(h,s,l){ return 'hsl('+h+','+s+'%,'+l+'%)'; }
+
+function renderColorPanel(){
+  const c = document.getElementById('colorPanelContent');
+  let html = '<h2>Node &amp; background style</h2>';
+  html += '<div class="colorPanelHint">Adjust color and size for each node type, plus the canvas background. Changes save automatically to this browser.</div>';
+
+  const bg = currentColors._background;
+  html += '<div class="colorRow" data-type="_background" style="background:#f3efe0;border-radius:8px;padding:8px 4px;margin-bottom:6px;">'+
+    '<div class="swatch" id="swatch__background" style="background:'+hsl(bg.h,bg.s,bg.l)+';"></div>'+
+    '<div class="rowLabel">Canvas background</div>'+
+    '<div class="sliderGroup">'+
+      sliderLine('_background','h','hue',bg.h,0,360)+
+      sliderLine('_background','s','sat',bg.s,0,100)+
+      sliderLine('_background','l','light',bg.l,0,100)+
+    '</div>'+
+    '<div class="sliderGroup"></div><div class="sliderGroup"></div>'+
+  '</div>';
+
+  Object.keys(TYPE_LABELS).forEach(type=>{
+    const col = currentColors[type];
+    const sizePct = Math.round((col.sizeScale||1.0)*100);
+    html += '<div class="colorRow" data-type="'+type+'" style="flex-direction:column;align-items:stretch;gap:8px;">'+
+      '<div style="display:flex;align-items:center;gap:12px;">'+
+        '<div class="swatch" id="swatch_'+type+'" style="background:hsla('+col.fillH+','+col.fillS+'%,'+col.fillL+'%,'+(col.fillA!==undefined?col.fillA:1)+');border:4px solid hsla('+col.borderH+','+col.borderS+'%,'+col.borderL+'%,'+(col.borderA!==undefined?col.borderA:1)+');"></div>'+
+        '<div class="rowLabel">'+TYPE_LABELS[type]+'</div>'+
+        '<div class="sliderGroup">'+
+          sliderLine(type,'fillH','hue',col.fillH,0,360)+
+          sliderLine(type,'fillS','sat',col.fillS,0,100)+
+          sliderLine(type,'fillL','light',col.fillL,0,100)+
+          '<div class="sliderLine"><label>alpha</label><input type="range" min="0" max="100" value="'+Math.round((col.fillA!==undefined?col.fillA:1)*100)+'" data-type="'+type+'" data-field="fillA"><span class="val">'+Math.round((col.fillA!==undefined?col.fillA:1)*100)+'%</span></div>'+
+        '</div>'+
+        '<div class="sliderGroup">'+
+          sliderLine(type,'borderH','hue',col.borderH,0,360)+
+          sliderLine(type,'borderS','sat',col.borderS,0,100)+
+          sliderLine(type,'borderL','light',col.borderL,0,100)+
+          '<div class="sliderLine"><label>alpha</label><input type="range" min="0" max="100" value="'+Math.round((col.borderA!==undefined?col.borderA:1)*100)+'" data-type="'+type+'" data-field="borderA"><span class="val">'+Math.round((col.borderA!==undefined?col.borderA:1)*100)+'%</span></div>'+
+        '</div>'+
+        '<div class="sliderGroup">'+
+          '<div class="sliderLine"><label>size</label><input type="range" min="50" max="200" value="'+sizePct+'" data-type="'+type+'" data-field="sizeScale"><span class="val">'+sizePct+'%</span></div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:12px;padding-left:56px;">'+
+        '<div style="width:104px;flex-shrink:0;font-size:10.5px;color:#aaa;">text &amp; font \u2193</div>'+
+        '<div class="sliderGroup">'+
+          sliderLine(type,'textH','hue',col.textH,0,360)+
+          sliderLine(type,'textS','sat',col.textS,0,100)+
+          sliderLine(type,'textL','light',col.textL,0,100)+
+        '</div>'+
+        '<div class="sliderGroup">'+
+          '<div class="sliderLine"><label>size</label><input type="range" min="11" max="32" value="'+col.fontSize+'" data-type="'+type+'" data-field="fontSize"><span class="val">'+col.fontSize+'</span></div>'+
+          '<div class="sliderLine"><label>line ht</label><input type="range" min="100" max="180" value="'+Math.round(col.lineHeight*100)+'" data-type="'+type+'" data-field="lineHeight"><span class="val">'+col.lineHeight.toFixed(2)+'</span></div>'+
+        '</div>'+
+        '<div class="sliderGroup">'+
+          '<div class="sliderLine"><label>weight</label>'+
+          '<select data-type="'+type+'" data-field="fontWeight" style="flex:1;font-size:11px;padding:3px;">'+
+            [300,400,500,600,700,800,900].map(w=>'<option value="'+w+'"'+(col.fontWeight===w?' selected':'')+'>'+
+              (w===300?'Light':w===400?'Regular':w===500?'Medium':w===600?'Semibold':w===700?'Bold':w===800?'Extra-bold':'Black')+'</option>').join('')+
+          '</select></div>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  });
+
+  html += '<div class="formButtons">'+
+    '<button class="saveBtn" onclick="closeColorPanel()" style="background:#2a5008;color:#fff;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:600;cursor:pointer;flex:1;">Done</button>'+
+    '<button class="cancelBtn" onclick="resetColorsToDefault()" style="background:#eee;color:#555;border:none;border-radius:8px;padding:11px 16px;font-size:13px;cursor:pointer;">Reset to default</button>'+
+  '</div>';
+
+  c.innerHTML = html;
+  wireColorSliders();
+}
+
+function sliderLine(type, field, label, val, min, max){
+  return '<div class="sliderLine">'+
+    '<label>'+label+'</label>'+
+    '<input type="range" min="'+min+'" max="'+max+'" value="'+val+'" data-type="'+type+'" data-field="'+field+'">'+
+    '<span class="val">'+val+'</span>'+
+  '</div>';
+}
+
+function wireColorSliders(){
+  document.querySelectorAll('#colorPanelContent input[type=range]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const type = e.target.dataset.type;
+      const field = e.target.dataset.field;
+      const rawVal = +e.target.value;
+
+      if(type === '_background'){
+        currentColors._background[field] = rawVal;
+        e.target.nextElementSibling.textContent = rawVal;
+        const bg = currentColors._background;
+        document.getElementById('swatch__background').style.background = hsl(bg.h,bg.s,bg.l);
+        applyColorStyles();
+      } else if(field === 'sizeScale'){
+        const val = rawVal / 100; // slider is 50-200 representing 0.5x-2.0x
+        currentColors[type][field] = val;
+        e.target.nextElementSibling.textContent = Math.round(val*100)+'%';
+        resizeAllNodesOfType(type);
+      } else if(field === 'lineHeight'){
+        const val = rawVal / 100; // slider is 100-180 representing 1.00-1.80
+        currentColors[type][field] = val;
+        e.target.nextElementSibling.textContent = val.toFixed(2);
+        applyColorStyles();
+      } else if(field === 'fontSize'){
+        currentColors[type][field] = rawVal;
+        e.target.nextElementSibling.textContent = rawVal;
+        applyColorStyles();
+      } else if(field === 'fillA' || field === 'borderA'){
+        currentColors[type][field] = rawVal/100;
+        e.target.nextElementSibling.textContent = rawVal+'%';
+        const col = currentColors[type];
+        const sw = document.getElementById('swatch_'+type);
+        sw.style.background = `hsla(${col.fillH},${col.fillS}%,${col.fillL}%,${col.fillA!==undefined?col.fillA:1})`;
+        sw.style.borderColor = `hsla(${col.borderH},${col.borderS}%,${col.borderL}%,${col.borderA!==undefined?col.borderA:1})`;
+        applyColorStyles();
+      } else if(field.startsWith('text')){
+        currentColors[type][field] = rawVal;
+        e.target.nextElementSibling.textContent = rawVal;
+        applyColorStyles();
+      } else {
+        currentColors[type][field] = rawVal;
+        e.target.nextElementSibling.textContent = rawVal;
+        const col = currentColors[type];
+        const sw = document.getElementById('swatch_'+type);
+        sw.style.background = `hsla(${col.fillH},${col.fillS}%,${col.fillL}%,${col.fillA!==undefined?col.fillA:1})`;
+        sw.style.borderColor = `hsla(${col.borderH},${col.borderS}%,${col.borderL}%,${col.borderA!==undefined?col.borderA:1})`;
+        applyColorStyles();
+      }
+      saveColors(currentColors);
+    });
+  });
+
+  document.querySelectorAll('#colorPanelContent select[data-field="fontWeight"]').forEach(sel=>{
+    sel.addEventListener('change', e=>{
+      const type = e.target.dataset.type;
+      currentColors[type].fontWeight = +e.target.value;
+      applyColorStyles();
+      saveColors(currentColors);
+    });
+  });
+}
+
+function resizeAllNodesOfType(type){
+  NODES.filter(n=>n.type===type).forEach(n=>{
+    const el = nodeElMap[n.id];
+    if(el) positionNodeEl(el, n);
+  });
+}
+
+function resetColorsToDefault(){
+  if(!confirm('Reset all node colors and sizes back to the original defaults? This does not affect positions or text.')) return;
+  currentColors = JSON.parse(JSON.stringify(DEFAULT_COLORS));
+  saveColors(currentColors);
+  applyColorStyles();
+  Object.keys(TYPE_LABELS).forEach(type=>resizeAllNodesOfType(type));
+  renderColorPanel();
+}
+
+// ============================================================
+// PANEL STYLE PANEL (legend, controls, detail/edit/style panel surfaces)
+// ============================================================
+// Panels you can't fully delete, because they're your only way back into the
+// editing tools. You can still shrink/hide their styling extremes, just not
+// remove them entirely and strand yourself.
+const PROTECTED_PANELS = ['editForm', 'colorPanel', 'controls'];
+
+function deletePanel(key){
+  if(PROTECTED_PANELS.includes(key)){
+    alert('This panel can\'t be deleted \u2014 it\'s one of the tools you use to edit the wall itself, including bringing back other deleted panels. Removing it would lock you out of editing. You can still shrink it down or make it more transparent instead.');
+    return;
+  }
+  if(!confirm('Hide the "' + PANEL_LABELS[key] + '" panel for this session? It will come back automatically next time you reload the page.')) return;
+  hiddenPanels[key] = true;
+  applyColorStyles();
+  renderPanelStylePanel();
+}
+
+function restorePanel(key){
+  delete hiddenPanels[key];
+  applyColorStyles();
+  renderPanelStylePanel();
+}
+
+function openPanelStylePanel(){
+  renderPanelStylePanel();
+  document.getElementById('panelStyleOverlay').style.display = 'flex';
+}
+function closePanelStylePanel(){
+  document.getElementById('panelStyleOverlay').style.display = 'none';
+}
+
+function renderPanelStylePanel(){
+  const c = document.getElementById('panelStyleContent');
+  let html = '<h2>Panel appearance</h2>';
+  html += '<div class="colorPanelHint">Adjust background color, transparency, corner rounding, size, or hide each floating panel for this session. Style/color changes save automatically; hiding a panel resets when you reload the page.</div>';
+
+  Object.keys(PANEL_LABELS).forEach(key=>{
+    const p = currentPanels[key];
+    const isHidden = !!hiddenPanels[key];
+    const isProtected = PROTECTED_PANELS.includes(key);
+    html += '<div class="colorRow" data-panel="'+key+'" style="flex-direction:column;align-items:stretch;gap:8px;'+(isHidden?'opacity:0.45;':'')+'">'+
+      '<div style="display:flex;align-items:center;gap:12px;">'+
+        '<div class="swatch" id="pswatch_'+key+'" style="border-radius:'+Math.min(p.radius,18)+'px;background:hsla('+p.h+','+p.s+'%,'+p.l+'%,'+p.a+');border:2px solid #ccc;"></div>'+
+        '<div class="rowLabel">'+PANEL_LABELS[key]+(isHidden?' <span style="color:#a01818;font-weight:400;">(hidden)</span>':'')+'</div>'+
+        '<div class="sliderGroup">'+
+          panelSliderLine(key,'h','hue',p.h,0,360)+
+          panelSliderLine(key,'s','sat',p.s,0,100)+
+          panelSliderLine(key,'l','light',p.l,0,100)+
+        '</div>'+
+        '<div class="sliderGroup">'+
+          '<div class="sliderLine"><label>alpha</label><input type="range" min="0" max="100" value="'+Math.round(p.a*100)+'" data-panel="'+key+'" data-field="a"><span class="val">'+Math.round(p.a*100)+'%</span></div>'+
+          '<div class="sliderLine"><label>round</label><input type="range" min="0" max="40" value="'+p.radius+'" data-panel="'+key+'" data-field="radius"><span class="val">'+p.radius+'</span></div>'+
+        '</div>'+
+        '<div class="sliderGroup">'+
+          (p.width !== undefined ? '<div class="sliderLine"><label>width</label><input type="range" min="280" max="900" value="'+p.width+'" data-panel="'+key+'" data-field="width"><span class="val">'+p.width+'</span></div>' : '')+
+          (p.height !== undefined ? '<div class="sliderLine"><label>height</label><input type="range" min="0" max="900" value="'+p.height+'" data-panel="'+key+'" data-field="height"><span class="val">'+(p.height||'auto')+'</span></div>' : '')+
+        '</div>'+
+        '<div style="flex-shrink:0;">'+
+          (isHidden
+            ? '<button onclick="restorePanel(\''+key+'\')" style="font-size:11px;padding:5px 9px;border:1px solid #2a5008;border-radius:6px;background:#eaf3de;color:#2a5008;cursor:pointer;">Restore</button>'
+            : '<button onclick="deletePanel(\''+key+'\')" title="'+(isProtected?'Protected \u2014 needed for editing':'Hide for this session')+'" style="font-size:11px;padding:5px 9px;border:1px solid '+(isProtected?'#ccc':'#c02e2e')+';border-radius:6px;background:'+(isProtected?'#f5f5f5':'#fce8e8')+';color:'+(isProtected?'#999':'#a01818')+';cursor:'+(isProtected?'not-allowed':'pointer')+';">\u2715 '+(isProtected?'Locked':'Delete')+'</button>')+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  });
+
+  html += '<div class="formButtons">'+
+    '<button class="saveBtn" onclick="closePanelStylePanel()" style="background:#2a5008;color:#fff;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:600;cursor:pointer;flex:1;">Done</button>'+
+    '<button class="cancelBtn" onclick="resetPanelsToDefault()" style="background:#eee;color:#555;border:none;border-radius:8px;padding:11px 16px;font-size:13px;cursor:pointer;">Reset to default</button>'+
+  '</div>';
+
+  c.innerHTML = html;
+  wirePanelStyleSliders();
+}
+
+function panelSliderLine(key, field, label, val, min, max){
+  return '<div class="sliderLine">'+
+    '<label>'+label+'</label>'+
+    '<input type="range" min="'+min+'" max="'+max+'" value="'+val+'" data-panel="'+key+'" data-field="'+field+'">'+
+    '<span class="val">'+val+'</span>'+
+  '</div>';
+}
+
+function wirePanelStyleSliders(){
+  document.querySelectorAll('#panelStyleContent input[type=range]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const key = e.target.dataset.panel;
+      const field = e.target.dataset.field;
+      let rawVal = +e.target.value;
+      if(field === 'a'){
+        currentPanels[key][field] = rawVal/100;
+        e.target.nextElementSibling.textContent = rawVal+'%';
+      } else if(field === 'height'){
+        currentPanels[key][field] = rawVal;
+        e.target.nextElementSibling.textContent = rawVal || 'auto';
+      } else {
+        currentPanels[key][field] = rawVal;
+        e.target.nextElementSibling.textContent = rawVal;
+      }
+      const p = currentPanels[key];
+      const sw = document.getElementById('pswatch_'+key);
+      if(sw){
+        sw.style.background = `hsla(${p.h},${p.s}%,${p.l}%,${p.a})`;
+        sw.style.borderRadius = Math.min(p.radius,18)+'px';
+      }
+      applyColorStyles();
+      savePanels(currentPanels);
+    });
+  });
+}
+
+function resetPanelsToDefault(){
+  if(!confirm('Reset all panel appearance settings (legend, controls, detail/edit/style panels) back to default, and bring back any hidden panels?')) return;
+  currentPanels = JSON.parse(JSON.stringify(DEFAULT_PANELS));
+  hiddenPanels = {};
+  savePanels(currentPanels);
+  applyColorStyles();
+  renderPanelStylePanel();
+}
+
+// ============================================================
+// VIEW TRANSFORM (pan/zoom — unchanged behavior)
+// ============================================================
+function applyTransform(){
+  world.style.transform = `translate(${-originX*scale}px, ${-originY*scale}px) scale(${scale})`;
+  document.getElementById('zoomLabel').textContent = Math.round(scale*100)+'%';
+}
+
+function zoomBy(factor, cx, cy){
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  if(cx===undefined) cx = vw/2;
+  if(cy===undefined) cy = vh/2;
+  const worldX = originX + cx/scale;
+  const worldY = originY + cy/scale;
+  scale = Math.min(2.2, Math.max(0.18, scale*factor));
+  originX = worldX - cx/scale;
+  originY = worldY - cy/scale;
+  applyTransform();
+}
+
+function resetView(){
+  scale = 0.62; originX=-60; originY=-40;
+  applyTransform();
+}
+
+function fitAll(){
+  if(NODES.length===0) return;
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  NODES.forEach(n=>{
+    minX=Math.min(minX,n.x-100); maxX=Math.max(maxX,n.x+100);
+    minY=Math.min(minY,n.y-100); maxY=Math.max(maxY,n.y+100);
+  });
+  ZONES.forEach(z=>{
+    minX=Math.min(minX,z.x-20); maxX=Math.max(maxX,z.x+z.w+20);
+    minY=Math.min(minY,z.y-20); maxY=Math.max(maxY,z.y+z.h+20);
+  });
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  const worldW = maxX-minX, worldH = maxY-minY;
+  scale = Math.min(vw/worldW, vh/worldH, 1.3);
+  scale = Math.max(scale, 0.15);
+  originX = minX - (vw/scale - worldW)/2;
+  originY = minY - (vh/scale - worldH)/2;
+  applyTransform();
+}
+
+// ---- background panning (only when not dragging a node) ----
+viewport.addEventListener('mousedown', e=>{
+  if(e.target.closest('.node')) return;
+  panning = true;
+  viewport.classList.add('panning');
+  panStartX = e.clientX; panStartY = e.clientY;
+  originStartX = originX; originStartY = originY;
+});
+window.addEventListener('mousemove', e=>{
+  if(!panning) return;
+  const dx = (e.clientX - panStartX)/scale;
+  const dy = (e.clientY - panStartY)/scale;
+  originX = originStartX - dx;
+  originY = originStartY - dy;
+  applyTransform();
+});
+window.addEventListener('mouseup', ()=>{
+  panning = false;
+  viewport.classList.remove('panning');
+});
+
+let touchStartDist=null, touchStartScale=1;
+viewport.addEventListener('touchstart', e=>{
+  if(e.touches.length===1){
+    if(e.target.closest('.node')) return;
+    panning=true;
+    panStartX=e.touches[0].clientX; panStartY=e.touches[0].clientY;
+    originStartX=originX; originStartY=originY;
+  } else if(e.touches.length===2){
+    panning=false;
+    const dx=e.touches[0].clientX-e.touches[1].clientX;
+    const dy=e.touches[0].clientY-e.touches[1].clientY;
+    touchStartDist=Math.hypot(dx,dy);
+    touchStartScale=scale;
+  }
+},{passive:true});
+viewport.addEventListener('touchmove', e=>{
+  if(e.touches.length===1 && panning){
+    const dx=(e.touches[0].clientX-panStartX)/scale;
+    const dy=(e.touches[0].clientY-panStartY)/scale;
+    originX=originStartX-dx; originY=originStartY-dy;
+    applyTransform();
+  } else if(e.touches.length===2 && touchStartDist){
+    const dx=e.touches[0].clientX-e.touches[1].clientX;
+    const dy=e.touches[0].clientY-e.touches[1].clientY;
+    const dist=Math.hypot(dx,dy);
+    const factor=(dist/touchStartDist);
+    scale = Math.min(2.2, Math.max(0.18, touchStartScale*factor));
+    applyTransform();
+  }
+},{passive:true});
+viewport.addEventListener('touchend', ()=>{ panning=false; touchStartDist=null; });
+
+viewport.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const rect = viewport.getBoundingClientRect();
+  const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+  const factor = e.deltaY < 0 ? 1.1 : 0.91;
+  zoomBy(factor, cx, cy);
+},{passive:false});
+
+// ============================================================
+// ZONE / CLUSTER RENDERING
+// ============================================================
+function renderZones(){
+  ZONES.forEach(z=>{
+    const el = createZoneEl(z, false);
+    world.insertBefore(el, svg);
+    zoneElMap[z.id] = el;
+    applyZoneStyle(el, z.id, false);
+  });
+}
+
+function renderClusters(){
+  if(typeof CLUSTERS === 'undefined') return;
+  CLUSTERS.forEach(c=>{
+    const el = createZoneEl(c, true);
+    world.insertBefore(el, svg);
+    clusterElMap[c.id] = el;
+    applyZoneStyle(el, c.id, true);
+  });
+}
+
+// ============================================================
+// NODE RENDERING
+// ============================================================
+const nodeMap = {};
+const nodeElMap = {};
+
+function renderNodes(){
+  NODES.forEach(n=>{
+    const el = document.createElement('div');
+    el.className = 'node ' + n.type;
+    el.id = 'node-'+n.id;
+    positionNodeEl(el, n);
+
+    if(n.avatar){
+      const av = document.createElement('div');
+      av.className = 'avatar';
+      renderAvatarInto(av, n.avatar);
+      el.appendChild(av);
+    }
+
+    const span = document.createElement('span');
+    span.className = 'lbl';
+    span.innerHTML = escapeHtml(n.label).replace(/\n/g,'<br>') + (n.detail ? '<span class="clickhint">click for details</span>' : '');
+    el.appendChild(span);
+
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if(editMode){ openEditForm(n); }
+      else if(n.detail){ openDetail(n); }
+    });
+    attachDrag(el, n);
+
+    world.appendChild(el);
+    nodeMap[n.id] = n;
+    nodeElMap[n.id] = el;
+  });
+}
+
+function positionNodeEl(el, n){
+  const w = sizeFor(n.type, n.tier);
+  el.style.left = (n.x - w/2)+'px';
+  el.style.top = (n.y - w/2)+'px';
+  el.style.width = w+'px';
+  if(n.type !== 'sticky') el.style.height = w+'px';
+}
+
+// avatar can be a short emoji string OR an image URL (http... / data:image...)
+function renderAvatarInto(container, avatar){
+  container.innerHTML = '';
+  if(/^(https?:|data:image)/.test(avatar)){
+    const img = document.createElement('img');
+    img.src = avatar;
+    img.style.width = '100%'; img.style.height = '100%';
+    img.style.borderRadius = '50%'; img.style.objectFit = 'cover';
+    img.onerror = ()=>{ container.textContent = '👤'; };
+    container.appendChild(img);
+  } else {
+    container.textContent = avatar;
+  }
+}
+
+function sizeFor(type, tier){
+  let base;
+  switch(type){
+    case 'center': base = 256; break;
+    case 'sticky': base = 220; break;
+    case 'branch': base = 180; break;
+    case 'bomb': base = 170; break;
+    case 'person': case 'fbi': base = 176; break;
+    case 'keyfind': base = 180; break;
+    case 'replacement': base = 170; break;
+    default: base = 152;
+  }
+  const mult = (type==='center' || type==='sticky') ? 1.0 : (tier===1 ? 1.4 : tier===3 ? 0.72 : 1.0);
+  const scale = (currentColors[type] && currentColors[type].sizeScale) || 1.0;
+  return Math.round(base * mult * scale);
+}
+
+// ============================================================
+// DRAG TO REPOSITION (edit mode only)
+// ============================================================
+function attachDrag(el, n){
+  let dragging = false, startClientX=0, startClientY=0, startNodeX=0, startNodeY=0;
+
+  el.addEventListener('mousedown', e=>{
+    if(!editMode) return;
+    e.stopPropagation();
+    dragging = true;
+    el.classList.add('dragging');
+    startClientX = e.clientX; startClientY = e.clientY;
+    startNodeX = n.x; startNodeY = n.y;
+  });
+
+  window.addEventListener('mousemove', e=>{
+    if(!dragging) return;
+    const dx = (e.clientX - startClientX)/scale;
+    const dy = (e.clientY - startClientY)/scale;
+    n.x = startNodeX + dx;
+    n.y = startNodeY + dy;
+    positionNodeEl(el, n);
+    redrawEdgesForNode(n.id);
+  });
+
+  window.addEventListener('mouseup', ()=>{
+    if(!dragging) return;
+    dragging = false;
+    el.classList.remove('dragging');
+    persistNode(n);
+  });
+
+  // touch support for dragging in edit mode
+  el.addEventListener('touchstart', e=>{
+    if(!editMode) return;
+    e.stopPropagation();
+    dragging = true;
+    el.classList.add('dragging');
+    startClientX = e.touches[0].clientX; startClientY = e.touches[0].clientY;
+    startNodeX = n.x; startNodeY = n.y;
+  },{passive:true});
+  el.addEventListener('touchmove', e=>{
+    if(!dragging) return;
+    const dx = (e.touches[0].clientX - startClientX)/scale;
+    const dy = (e.touches[0].clientY - startClientY)/scale;
+    n.x = startNodeX + dx;
+    n.y = startNodeY + dy;
+    positionNodeEl(el, n);
+    redrawEdgesForNode(n.id);
+  },{passive:true});
+  el.addEventListener('touchend', ()=>{
+    if(!dragging) return;
+    dragging = false;
+    el.classList.remove('dragging');
+    persistNode(n);
+  });
+}
+
+function redrawEdgesForNode(nodeId){
+  const lines = svg.querySelectorAll('line[data-from="'+nodeId+'"], line[data-to="'+nodeId+'"]');
+  lines.forEach(line=>{
+    const fromId = line.getAttribute('data-from');
+    const toId = line.getAttribute('data-to');
+    const a = nodeMap[fromId], b = nodeMap[toId];
+    if(!a||!b) return;
+    line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
+    line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
+  });
+}
+
+function renderEdges(){
+  svg.setAttribute('width','5000');
+  svg.setAttribute('height','2550');
+  EDGES.forEach(([fromId,toId,type])=>{
+    const a = nodeMap[fromId], b = nodeMap[toId];
+    if(!a||!b) return;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
+    line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
+    line.setAttribute('data-from', fromId);
+    line.setAttribute('data-to', toId);
+    let cls = 'web-line';
+    if(type && type!=='normal') cls += ' '+type;
+    line.setAttribute('class', cls);
+    svg.appendChild(line);
+  });
+}
+
+// ============================================================
+// EDIT MODE TOGGLE
+// ============================================================
+function toggleEditMode(){
+  editMode = !editMode;
+  document.body.classList.toggle('edit-mode', editMode);
+  const btn = document.getElementById('editModeBtn');
+  const resetBtn = document.getElementById('resetDataBtn');
+  const colorBtn = document.getElementById('colorPanelBtn');
+  const panelBtn = document.getElementById('panelStyleBtn');
+  const addBtn = document.getElementById('addNodeBtn');
+  const exportBtn = document.getElementById('exportBtn');
+  const hint = document.getElementById('hint');
+  if(editMode){
+    btn.textContent = '✏️ Edit mode: ON';
+    btn.classList.add('active');
+    resetBtn.style.display = 'inline-block';
+    colorBtn.style.display = 'inline-block';
+    panelBtn.style.display = 'inline-block';
+    addBtn.style.display = 'inline-block';
+    document.getElementById('addZoneBtn').style.display = 'inline-block';
+    exportBtn.style.display = 'inline-block';
+    hint.textContent = 'Edit mode: drag any circle to reposition · click a circle to edit its content';
+  } else {
+    btn.textContent = '✏️ Edit mode: OFF';
+    btn.classList.remove('active');
+    resetBtn.style.display = 'none';
+    colorBtn.style.display = 'none';
+    panelBtn.style.display = 'none';
+    addBtn.style.display = 'none';
+    document.getElementById('addZoneBtn').style.display = 'none';
+    exportBtn.style.display = 'none';
+    hint.textContent = 'Drag to pan · Scroll/pinch to zoom · Click a node for details';
+  }
+}
+
+// ============================================================
+// DETAIL PANEL (view mode)
+// ============================================================
+function openDetail(n){
+  const d = n.detail;
+  const overlay = document.getElementById('overlay');
+  const content = document.getElementById('detailContent');
+
+  let html = '';
+  html += '<div class="headerRow">';
+  if(n.avatar){
+    html += '<div class="avatarBig" id="detailAvatarBig"></div>';
+  }
+  html += '<div><h2>'+escapeHtml(d.title)+'</h2></div></div>';
+  if(d.subtitle) html += '<div class="subtitle">'+escapeHtml(d.subtitle)+'</div>';
+  if(d.tag) html += '<div class="tag '+d.tag+'">'+tagLabel(d.tag)+'</div>';
+
+  d.sections.forEach(sec=>{
+    html += '<section><h3>'+escapeHtml(sec.h)+'</h3><ul>';
+    sec.items.forEach(item=>{
+      html += '<li>'+escapeHtml(item)+'</li>';
+    });
+    html += '</ul></section>';
+  });
+
+  if(d.docs && d.docs.length){
+    html += '<section><h3>Supporting documents &amp; links</h3>';
+    d.docs.forEach(doc=>{
+      if(doc.url){
+        html += '<div class="docItem"><span class="docIcon">&#128206;</span><span class="docLabel"><a href="'+escapeAttr(doc.url)+'" target="_blank" rel="noopener">'+escapeHtml(doc.label)+'</a></span></div>';
+      } else {
+        html += '<div class="docItem placeholder"><span class="docIcon">&#128206;</span><span class="docLabel">'+escapeHtml(doc.label)+' — link not yet added</span></div>';
+      }
+    });
+    html += '<div class="addDocHint">Turn on Edit mode and click this node to add real links and photos.</div>';
+    html += '</section>';
+  }
+
+  const connected = EDGES.filter(([f,t])=>f===n.id||t===n.id)
+    .map(([f,t])=>f===n.id?t:f)
+    .filter(id=>nodeMap[id]);
+  if(connected.length){
+    html += '<section><h3>Connected to</h3><div class="connections">';
+    connected.forEach(id=>{
+      const lbl = nodeMap[id].label.replace(/\n/g,' ');
+      html += '<span onclick="jumpTo(\''+id+'\')">'+escapeHtml(lbl)+'</span>';
+    });
+    html += '</div></section>';
+  }
+
+  content.innerHTML = html;
+  if(n.avatar){
+    renderAvatarInto(document.getElementById('detailAvatarBig'), n.avatar);
+  }
+  overlay.style.display = 'flex';
+}
+
+function closeDetail(){
+  document.getElementById('overlay').style.display = 'none';
+}
+
+function jumpTo(id){
+  closeDetail();
+  const n = nodeMap[id];
+  if(!n) return;
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  scale = Math.max(scale, 0.7);
+  originX = n.x - vw/(2*scale);
+  originY = n.y - vh/(2*scale);
+  applyTransform();
+  const el = document.getElementById('node-'+id);
+  if(el){
+    el.style.transform = 'scale(1.25)';
+    setTimeout(()=>{ el.style.transform=''; }, 600);
+  }
+}
+
+function tagLabel(tag){
+  const map = {
+    bomb:'\u{1F4A3} Bombshell', confirmed:'\u2713 Confirmed', warning:'\u26A0 Warning',
+    danger:'? Open Question', entity:'\u{1F3E2} Entity', person:'\u{1F464} Person',
+    fbi:'\u{1F535} FBI-Connected', keyfind:"\u2605 Key Finding", dissolved:'\u{1F480} Dissolved',
+    replacement:'\u{1F501} Replacement Entity', branch:'Topic'
+  };
+  return map[tag] || tag;
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+function escapeAttr(str){
+  return str.replace(/"/g,'&quot;');
+}
+
+// ============================================================
+// CREATE NEW NODE (edit mode)
+// ============================================================
+let nextNewNodeNum = 1;
+
+function addNewNode(){
+  // figure out where the center of the current view is, in world coordinates
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  const worldCenterX = Math.round(originX + (vw/2)/scale);
+  const worldCenterY = Math.round(originY + (vh/2)/scale);
+
+  // generate a unique id
+  let id;
+  do {
+    id = 'newnode'+nextNewNodeNum;
+    nextNewNodeNum++;
+  } while(nodeMap[id]);
+
+  const n = {
+    id: id,
+    x: worldCenterX,
+    y: worldCenterY,
+    type: 'entity',
+    tier: 2,
+    label: 'New node',
+    detail: {
+      title: 'New node',
+      subtitle: '',
+      tag: 'entity',
+      sections: [{h:'Notes', items:['Click here to edit this text.']}],
+      docs: []
+    }
+  };
+
+  NODES.push(n);
+  nodeMap[id] = n;
+
+  const el = document.createElement('div');
+  el.className = 'node ' + n.type;
+  el.id = 'node-'+n.id;
+  positionNodeEl(el, n);
+
+  const span = document.createElement('span');
+  span.className = 'lbl';
+  span.innerHTML = escapeHtml(n.label).replace(/\n/g,'<br>') + '<span class="clickhint">click for details</span>';
+  el.appendChild(span);
+
+  el.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    if(editMode){ openEditForm(n); }
+    else if(n.detail){ openDetail(n); }
+  });
+  attachDrag(el, n);
+
+  world.appendChild(el);
+  nodeElMap[id] = el;
+
+  persistNode(n);
+  persistNewNodeList();
+
+  // open the edit form right away so it's easy to fill in
+  openEditForm(n);
+}
+
+function persistNewNodeList(){
+  try{
+    const createdNodes = NODES.filter(n=>n.id.startsWith('newnode'));
+    const ids = createdNodes.map(n=>n.id);
+    localStorage.setItem('bamwall_created_nodes_v1', JSON.stringify(ids));
+    // sync full node data (not just ids) so other devices get the new nodes too
+    syncSaveToServer('created_nodes', createdNodes);
+  }catch(e){ console.warn('Could not persist created-node list', e); }
+}
+
+async function refreshCreatedNodesFromServer(){
+  const serverNodes = await syncLoadFromServer('created_nodes');
+  if(!serverNodes || !Array.isArray(serverNodes)) return;
+  serverNodes.forEach(n=>{
+    if(!nodeMap[n.id]){
+      NODES.push(n);
+      nodeMap[n.id] = n;
+      const el = document.createElement('div');
+      el.className = 'node ' + n.type;
+      el.id = 'node-'+n.id;
+      positionNodeEl(el, n);
+      if(n.avatar){ const av=document.createElement('div'); av.className='avatar'; renderAvatarInto(av,n.avatar); el.appendChild(av); }
+      const span=document.createElement('span'); span.className='lbl';
+      span.innerHTML=escapeHtml(n.label).replace(/\n/g,'<br>')+'<span class="clickhint">click for details</span>';
+      el.appendChild(span);
+      el.addEventListener('click',(e)=>{ e.stopPropagation(); if(editMode){openEditForm(n);}else if(n.detail){openDetail(n);} });
+      attachDrag(el,n);
+      world.appendChild(el);
+      nodeElMap[n.id]=el;
+    }
+  });
+  // re-apply overrides on top of restored nodes
+  applyOverridesToNodes();
+}
+
+// ============================================================
+// EDIT FORM (edit mode — full content editor)
+// ============================================================
+let editingNodeId = null;
+let editDraft = null; // working copy of detail being edited
+
+function ensureDetail(n){
+  if(!n.detail){
+    n.detail = { title: n.label.replace(/\n/g,' '), subtitle:'', tag: n.type, sections: [], docs: [] };
+  }
+  if(!n.detail.sections) n.detail.sections = [];
+  if(!n.detail.docs) n.detail.docs = [];
+  return n.detail;
+}
+
+function openEditForm(n){
+  editingNodeId = n.id;
+  const d = ensureDetail(n);
+  editDraft = JSON.parse(JSON.stringify(d)); // deep copy for editing
+  editDraft._label = n.label;
+  editDraft._avatar = n.avatar || '';
+  renderEditForm();
+  document.getElementById('editFormOverlay').style.display = 'flex';
+}
+
+function closeEditForm(){
+  document.getElementById('editFormOverlay').style.display = 'none';
+  editingNodeId = null;
+  editDraft = null;
+}
+
+function renderEditForm(){
+  const c = document.getElementById('editFormContent');
+  let html = '';
+  html += '<h2>Edit node</h2>';
+
+  html += '<label>Label (shown on the circle — use line breaks for multi-line)</label>'+
+    '<textarea id="ef_label">'+escapeHtml(editDraft._label)+'</textarea>';
+
+  html += '<label>Avatar (emoji, paste an image URL, or upload a photo below)</label>'+
+    '<input type="text" id="ef_avatar" value="'+escapeAttr(editDraft._avatar)+'" placeholder="\ud83d\udc64 or https://...jpg">'+
+    '<div style="display:flex;align-items:center;gap:10px;margin-top:8px;">'+
+      '<input type="file" id="ef_avatar_file" accept="image/*" style="flex:1;font-size:12px;">'+
+      '<div class="avatarPreview" id="ef_avatar_preview">'+(editDraft._avatar && !/^(https?:|data:image)/.test(editDraft._avatar) ? editDraft._avatar : '\ud83d\udc64')+'</div>'+
+    '</div>'+
+    '<div style="font-size:10.5px;color:#aaa;margin-top:4px;">Uploaded photos are stored in this browser only \u2014 not on any server.</div>';
+
+  html += '<label>Title (shown at top of detail panel)</label>'+
+    '<input type="text" id="ef_title" value="'+escapeAttr(editDraft.title||'')+'">';
+
+  html += '<label>Subtitle</label>'+
+    '<input type="text" id="ef_subtitle" value="'+escapeAttr(editDraft.subtitle||'')+'">';
+
+  html += '<label>Sections</label>';
+  editDraft.sections.forEach((sec, si)=>{
+    html += '<div class="sectionBlock" data-si="'+si+'">'+
+      '<button class="removeBtn" onclick="removeSection('+si+')">remove section</button>'+
+      '<input type="text" style="margin-bottom:8px;font-weight:600;" value="'+escapeAttr(sec.h)+'" data-field="h" data-si="'+si+'">';
+    sec.items.forEach((item, ii)=>{
+      html += '<div class="bulletRow" data-si="'+si+'" data-ii="'+ii+'">'+
+        '<textarea data-field="item" data-si="'+si+'" data-ii="'+ii+'">'+escapeHtml(item)+'</textarea>'+
+        '<button class="removeBtn" onclick="removeBullet('+si+','+ii+')">×</button>'+
+      '</div>';
+    });
+    html += '<button class="addBtn" onclick="addBullet('+si+')">+ add bullet</button>'+
+    '</div>';
+  });
+  html += '<button class="addBtn" onclick="addSection()">+ add section</button>';
+
+  html += '<label style="margin-top:18px;">Supporting documents &amp; links</label>';
+  editDraft.docs.forEach((doc, di)=>{
+    html += '<div class="docRow" data-di="'+di+'">'+
+      '<input type="text" placeholder="Label" value="'+escapeAttr(doc.label)+'" data-field="doclabel" data-di="'+di+'">'+
+      '<input type="text" placeholder="https://... (leave blank for placeholder)" value="'+escapeAttr(doc.url||'')+'" data-field="docurl" data-di="'+di+'">'+
+      '<button class="removeBtn" onclick="removeDoc('+di+')">×</button>'+
+    '</div>';
+  });
+  html += '<button class="addBtn" onclick="addDoc()">+ add document/link</button>';
+
+  html += '<div class="formButtons">'+
+    '<button class="saveBtn" onclick="saveEditForm()">Save changes</button>'+
+    '<button class="cancelBtn" onclick="closeEditForm()">Cancel</button>'+
+  '</div>';
+
+  c.innerHTML = html;
+  wireEditFormInputs();
+}
+
+function wireEditFormInputs(){
+  const c = document.getElementById('editFormContent');
+  c.querySelectorAll('input[data-field="h"]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const si = +e.target.dataset.si;
+      editDraft.sections[si].h = e.target.value;
+    });
+  });
+  c.querySelectorAll('textarea[data-field="item"]').forEach(ta=>{
+    ta.addEventListener('input', e=>{
+      const si = +e.target.dataset.si, ii = +e.target.dataset.ii;
+      editDraft.sections[si].items[ii] = e.target.value;
+    });
+  });
+  c.querySelectorAll('input[data-field="doclabel"]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const di = +e.target.dataset.di;
+      editDraft.docs[di].label = e.target.value;
+    });
+  });
+  c.querySelectorAll('input[data-field="docurl"]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const di = +e.target.dataset.di;
+      editDraft.docs[di].url = e.target.value.trim() || null;
+    });
+  });
+
+  const avatarUrlInput = document.getElementById('ef_avatar');
+  const avatarPreview = document.getElementById('ef_avatar_preview');
+  if(avatarUrlInput){
+    avatarUrlInput.addEventListener('input', e=>{
+      const val = e.target.value.trim();
+      updateAvatarPreview(avatarPreview, val);
+    });
+  }
+
+  const avatarFileInput = document.getElementById('ef_avatar_file');
+  if(avatarFileInput){
+    avatarFileInput.addEventListener('change', e=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      if(file.size > 2 * 1024 * 1024){
+        alert('That image is over 2MB. Please choose a smaller photo \u2014 large images can slow down the wall and fill up browser storage quickly.');
+        e.target.value = '';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        const dataUrl = reader.result;
+        avatarUrlInput.value = dataUrl;
+        updateAvatarPreview(avatarPreview, dataUrl);
+      };
+      reader.onerror = ()=>{
+        alert('Could not read that file. Please try a different image.');
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+}
+
+function updateAvatarPreview(previewEl, val){
+  if(!val){ previewEl.textContent = '\ud83d\udc64'; return; }
+  if(/^(https?:|data:image)/.test(val)){
+    previewEl.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = val;
+    img.style.width = '100%'; img.style.height = '100%';
+    img.style.borderRadius = '50%'; img.style.objectFit = 'cover';
+    img.onerror = ()=>{ previewEl.textContent = '\ud83d\udc64'; };
+    previewEl.appendChild(img);
+  } else {
+    previewEl.textContent = val;
+  }
+}
+
+function addSection(){
+  editDraft.sections.push({h:'New section', items:['New bullet point']});
+  renderEditForm();
+}
+function removeSection(si){
+  editDraft.sections.splice(si,1);
+  renderEditForm();
+}
+function addBullet(si){
+  editDraft.sections[si].items.push('New bullet point');
+  renderEditForm();
+}
+function removeBullet(si, ii){
+  editDraft.sections[si].items.splice(ii,1);
+  renderEditForm();
+}
+function addDoc(){
+  editDraft.docs.push({label:'New document', url:null});
+  renderEditForm();
+}
+function removeDoc(di){
+  editDraft.docs.splice(di,1);
+  renderEditForm();
+}
+
+function saveEditForm(){
+  const n = nodeMap[editingNodeId];
+  if(!n) return;
+
+  editDraft._label = document.getElementById('ef_label').value;
+  editDraft._avatar = document.getElementById('ef_avatar').value.trim();
+  editDraft.title = document.getElementById('ef_title').value;
+  editDraft.subtitle = document.getElementById('ef_subtitle').value;
+
+  n.label = editDraft._label;
+  n.avatar = editDraft._avatar || null;
+  n.detail.title = editDraft.title;
+  n.detail.subtitle = editDraft.subtitle;
+  n.detail.sections = editDraft.sections;
+  n.detail.docs = editDraft.docs;
+
+  const el = nodeElMap[n.id];
+  if(el){
+    el.innerHTML = '';
+    if(n.avatar){
+      const av = document.createElement('div');
+      av.className = 'avatar';
+      renderAvatarInto(av, n.avatar);
+      el.appendChild(av);
+    }
+    const span = document.createElement('span');
+    span.className = 'lbl';
+    span.innerHTML = escapeHtml(n.label).replace(/\n/g,'<br>') + '<span class="clickhint">click for details</span>';
+    el.appendChild(span);
+  }
+
+  persistNode(n);
+  closeEditForm();
+}
+
+window.addEventListener('keydown', e=>{
+  if(e.key === 'Escape'){
+    closeDetail();
+    closeEditForm();
+    closeZoneEditForm();
+  }
+});
+
+// ============================================================
+// ZONE / CLUSTER EDITING
+// ============================================================
+const ZONE_STORAGE_KEY = 'bamwall_zones_v1';
+
+const ZONE_STYLE_DEFAULTS = {
+  corporate:      {fillH:210,fillS:83,fillL:66,fillA:.10,bH:210,bS:83,bL:66,bA:.45,bStyle:'dashed',radius:32},
+  legallymine:    {fillH:18, fillS:79,fillL:63,fillA:.10,bH:18, bS:79,bL:63,bA:.45,bStyle:'dashed',radius:32},
+  'cl-officers':  {fillH:210,fillS:83,fillL:66,fillA:.09,bH:210,bS:83,bL:66,bA:.40,bStyle:'dashed',radius:20},
+  'cl-delaware':  {fillH:155,fillS:44,fillL:59,fillA:.10,bH:155,bS:44,bL:59,bA:.42,bStyle:'dashed',radius:20},
+  'cl-storeweb':  {fillH:33, fillS:100,fillL:69,fillA:.10,bH:33, bS:100,bL:69,bA:.42,bStyle:'dashed',radius:20},
+  'cl-fdd':       {fillH:33, fillS:50, fillL:55,fillA:.10,bH:33, bS:50, bL:55,bA:.40,bStyle:'dashed',radius:20},
+  'cl-gap':       {fillH:0,  fillS:72, fillL:73,fillA:.10,bH:0,  bS:72, bL:73,bA:.42,bStyle:'dashed',radius:20},
+  'cl-people':    {fillH:276,fillS:40, fillL:66,fillA:.11,bH:276,bS:40, bL:66,bA:.42,bStyle:'dashed',radius:20},
+  'cl-renames':   {fillH:18, fillS:79, fillL:63,fillA:.10,bH:18, bS:79, bL:63,bA:.42,bStyle:'dashed',radius:20},
+  'cl-entityweb': {fillH:210,fillS:83, fillL:66,fillA:.08,bH:210,bS:83, bL:66,bA:.38,bStyle:'dashed',radius:20},
+  'cl-fusion':    {fillH:0,  fillS:100,fillL:68,fillA:.10,bH:0,  bS:100,bL:68,bA:.40,bStyle:'dashed',radius:20},
+  'cl-alaska':    {fillH:33, fillS:50, fillL:55,fillA:.10,bH:33, bS:50, bL:55,bA:.40,bStyle:'dashed',radius:20},
+};
+function getZSD(cls){ return Object.assign({}, ZONE_STYLE_DEFAULTS[cls] || {fillH:210,fillS:50,fillL:60,fillA:.12,bH:210,bS:50,bL:60,bA:.40,bStyle:'dashed',radius:24}); }
+
+let zoneOverrides = {}, clusterOverrides = {};
+const zoneElMap = {}, clusterElMap = {};
+let editingZoneId = null, editingIsCluster = false;
+let nextZoneNum = 1;
+let _zeState = {};
+
+function loadZoneData(){
+  try{
+    const raw = localStorage.getItem(ZONE_STORAGE_KEY);
+    if(!raw) return;
+    const d = JSON.parse(raw);
+    zoneOverrides = d.zones || {};
+    clusterOverrides = d.clusters || {};
+    (d.added||[]).forEach(z=>{ if(!ZONES.find(x=>x.id===z.id)) ZONES.push(z); });
+    (d.addedClusters||[]).forEach(c=>{ if(!CLUSTERS.find(x=>x.id===c.id)) CLUSTERS.push(c); });
+    applyZonePosOverrides();
+  }catch(e){}
+}
+
+function applyZonePosOverrides(){
+  ZONES.forEach(z=>{ const o=zoneOverrides[z.id]; if(!o) return; if(o.x!=null)z.x=o.x; if(o.y!=null)z.y=o.y; if(o.w!=null)z.w=o.w; if(o.h!=null)z.h=o.h; });
+  CLUSTERS.forEach(c=>{ const o=clusterOverrides[c.id]; if(!o) return; if(o.x!=null)c.x=o.x; if(o.y!=null)c.y=o.y; if(o.w!=null)c.w=o.w; if(o.h!=null)c.h=o.h; });
+}
+
+function buildZonePayload(){
+  return { zones:zoneOverrides, clusters:clusterOverrides, added:ZONES.filter(z=>z._added), addedClusters:CLUSTERS.filter(c=>c._added) };
+}
+
+function saveZoneData(){
+  try{ localStorage.setItem(ZONE_STORAGE_KEY, JSON.stringify(buildZonePayload())); }catch(e){}
+  syncSaveToServer('node_overrides', Object.assign({}, overrides, {_zoneData:buildZonePayload()}));
+}
+
+function applyZoneStyle(el, id, isCluster){
+  const item = (isCluster?CLUSTERS:ZONES).find(x=>x.id===id);
+  if(!item) return;
+  const o = (isCluster?clusterOverrides:zoneOverrides)[id] || {};
+  const s = Object.assign({}, getZSD(item.cls||''), o);
+  el.style.background = `hsla(${s.fillH},${s.fillS}%,${s.fillL}%,${s.fillA})`;
+  el.style.border = `2px ${s.bStyle||'dashed'} hsla(${s.bH},${s.bS}%,${s.bL}%,${s.bA})`;
+  el.style.borderRadius = s.radius+'px';
+  const lblEl = el.querySelector('.zone-label,.cluster-label');
+  if(lblEl) lblEl.textContent = o.label!=null ? o.label : (item.label||'');
+  const subEl = el.querySelector('.zone-sublabel');
+  if(subEl) subEl.textContent = o.sublabel!=null ? o.sublabel : (item.sublabel||'');
+}
+
+function createZoneEl(z, isCluster){
+  const el = document.createElement('div');
+  el.className = (isCluster?'cluster ':'zone ')+(z.cls||'');
+  el.style.left=z.x+'px'; el.style.top=z.y+'px';
+  el.style.width=z.w+'px'; el.style.height=z.h+'px';
+  const lbl = document.createElement('div');
+  lbl.className = isCluster?'cluster-label':'zone-label';
+  lbl.textContent = z.label||'';
+  el.appendChild(lbl);
+  if(!isCluster && z.sublabel){
+    const sub = document.createElement('div');
+    sub.className='zone-sublabel'; sub.textContent=z.sublabel;
+    el.appendChild(sub);
+  }
+  const editBtn = document.createElement('div');
+  editBtn.className='zone-edit-btn'; editBtn.textContent='✎'; editBtn.title='Edit zone';
+  editBtn.addEventListener('click', e=>{ e.stopPropagation(); openZoneEditForm(z.id,isCluster); });
+  el.appendChild(editBtn);
+  const resH = document.createElement('div');
+  resH.className='zone-resize-handle';
+  el.appendChild(resH);
+  attachZoneDrag(el, z.id, isCluster);
+  return el;
+}
+
+function attachZoneDrag(el, id, isCluster){
+  let dragging=false, resizing=false, sX, sY, sVX, sVY, sW, sH;
+  const rh = el.querySelector('.zone-resize-handle');
+  const getItem = ()=>(isCluster?CLUSTERS:ZONES).find(x=>x.id===id);
+
+  el.addEventListener('mousedown', e=>{
+    if(!editMode||e.target===rh||e.target.classList.contains('zone-edit-btn')) return;
+    e.stopPropagation(); dragging=true;
+    sX=e.clientX; sY=e.clientY;
+    const it=getItem(); sVX=it.x; sVY=it.y;
+  });
+  rh && rh.addEventListener('mousedown', e=>{
+    if(!editMode) return;
+    e.stopPropagation(); resizing=true;
+    sX=e.clientX; sY=e.clientY;
+    const it=getItem(); sW=it.w; sH=it.h;
+  });
+  window.addEventListener('mousemove', e=>{
+    const it=getItem(); if(!it) return;
+    if(dragging){
+      it.x=Math.round(sVX+(e.clientX-sX)/scale); it.y=Math.round(sVY+(e.clientY-sY)/scale);
+      el.style.left=it.x+'px'; el.style.top=it.y+'px';
+    } else if(resizing){
+      it.w=Math.max(80,Math.round(sW+(e.clientX-sX)/scale));
+      it.h=Math.max(50,Math.round(sH+(e.clientY-sY)/scale));
+      el.style.width=it.w+'px'; el.style.height=it.h+'px';
+    }
+  });
+  window.addEventListener('mouseup', ()=>{
+    if(!dragging&&!resizing) return;
+    const it=getItem();
+    if(it){
+      const store=isCluster?clusterOverrides:zoneOverrides;
+      if(!store[id]) store[id]={};
+      Object.assign(store[id],{x:it.x,y:it.y,w:it.w,h:it.h});
+    }
+    dragging=false; resizing=false;
+    saveZoneData();
+  });
+}
+
+function openZoneEditForm(id, isCluster){
+  editingZoneId=id; editingIsCluster=isCluster;
+  renderZoneEditForm();
+  document.getElementById('zoneEditOverlay').style.display='flex';
+}
+function closeZoneEditForm(){
+  document.getElementById('zoneEditOverlay').style.display='none';
+  editingZoneId=null;
+}
+
+function renderZoneEditForm(){
+  const arr=editingIsCluster?CLUSTERS:ZONES;
+  const item=arr.find(x=>x.id===editingZoneId);
+  if(!item) return;
+  const def=getZSD(item.cls||'');
+  const o=(editingIsCluster?clusterOverrides:zoneOverrides)[editingZoneId]||{};
+  const s=Object.assign({},def,o);
+  _zeState=Object.assign({},s);
+  const label=o.label!=null?o.label:(item.label||'');
+  const sublabel=o.sublabel!=null?o.sublabel:(item.sublabel||'');
+
+  function sr(field,lbl,val,min,max){
+    return `<div class="zeSliderRow"><label>${lbl}</label><input type="range" min="${min}" max="${max}" value="${val}" data-zef="${field}"><span>${field==='fillA'||field==='bA'?Math.round(val*100)+'%':val}</span></div>`;
+  }
+
+  let html=`<h2>Edit ${editingIsCluster?'cluster':'zone'}</h2>
+    <label>Label</label><input type="text" id="ze_label" value="${escapeAttr(label)}">`;
+  if(!editingIsCluster) html+=`<label>Sublabel</label><input type="text" id="ze_sublabel" value="${escapeAttr(sublabel)}">`;
+  html+=`<label>Border style</label>
+    <div style="display:flex;gap:14px;margin-top:4px;">
+      <label style="display:flex;align-items:center;gap:5px;text-transform:none;letter-spacing:0;color:#333;font-size:13px;margin:0;"><input type="radio" name="ze_bstyle" value="dashed" ${s.bStyle==='dashed'?'checked':''}> Dashed</label>
+      <label style="display:flex;align-items:center;gap:5px;text-transform:none;letter-spacing:0;color:#333;font-size:13px;margin:0;"><input type="radio" name="ze_bstyle" value="solid" ${s.bStyle==='solid'?'checked':''}> Solid</label>
+    </div>
+    <label>Corner radius</label>${sr('radius','px',s.radius,0,64)}
+    <div class="zeColorSec">
+      <h3><div class="zePreview" id="ze_fp" style="background:hsla(${s.fillH},${s.fillS}%,${s.fillL}%,${s.fillA})"></div>Fill color</h3>
+      ${sr('fillH','hue',s.fillH,0,360)}${sr('fillS','sat',s.fillS,0,100)}${sr('fillL','light',s.fillL,0,100)}
+      <div class="zeSliderRow"><label>alpha</label><input type="range" min="0" max="100" value="${Math.round(s.fillA*100)}" data-zef="fillA" data-pct="1"><span>${Math.round(s.fillA*100)}%</span></div>
+    </div>
+    <div class="zeColorSec">
+      <h3><div class="zePreview" id="ze_bp" style="background:hsla(${s.bH},${s.bS}%,${s.bL}%,${s.bA})"></div>Border color</h3>
+      ${sr('bH','hue',s.bH,0,360)}${sr('bS','sat',s.bS,0,100)}${sr('bL','light',s.bL,0,100)}
+      <div class="zeSliderRow"><label>alpha</label><input type="range" min="0" max="100" value="${Math.round(s.bA*100)}" data-zef="bA" data-pct="1"><span>${Math.round(s.bA*100)}%</span></div>
+    </div>
+    <div class="formButtons">
+      <button class="saveBtn" onclick="saveZoneEditForm()">Save</button>
+      <button class="cancelBtn" onclick="closeZoneEditForm()">Cancel</button>
+      ${item._added?`<button class="deleteBtn" onclick="deleteZone('${editingZoneId}',${editingIsCluster})">Delete</button>`:''}
+    </div>`;
+
+  document.getElementById('zoneEditContent').innerHTML=html;
+
+  // Wire sliders — alpha fields use 0–1 range stored as float
+  document.querySelectorAll('#zoneEditContent input[data-zef]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const f=e.target.dataset.zef; const raw=+e.target.value;
+      const isPct = !!e.target.dataset.pct;
+      _zeState[f] = isPct ? raw/100 : raw;
+      e.target.nextElementSibling.textContent = isPct ? raw+'%' : raw;
+      document.getElementById('ze_fp').style.background=`hsla(${_zeState.fillH},${_zeState.fillS}%,${_zeState.fillL}%,${_zeState.fillA})`;
+      document.getElementById('ze_bp').style.background=`hsla(${_zeState.bH},${_zeState.bS}%,${_zeState.bL}%,${_zeState.bA})`;
+    });
+  });
+}
+
+function saveZoneEditForm(){
+  const arr=editingIsCluster?CLUSTERS:ZONES;
+  const item=arr.find(x=>x.id===editingZoneId);
+  if(!item) return;
+  const bStyle=document.querySelector('input[name="ze_bstyle"]:checked')?.value||'dashed';
+  const label=document.getElementById('ze_label').value;
+  const subEl=document.getElementById('ze_sublabel');
+  const store=editingIsCluster?clusterOverrides:zoneOverrides;
+  store[editingZoneId]=Object.assign({x:item.x,y:item.y,w:item.w,h:item.h},_zeState,{bStyle,label});
+  if(subEl) store[editingZoneId].sublabel=subEl.value;
+  const el=editingIsCluster?clusterElMap[editingZoneId]:zoneElMap[editingZoneId];
+  if(el) applyZoneStyle(el,editingZoneId,editingIsCluster);
+  saveZoneData();
+  closeZoneEditForm();
+}
+
+function deleteZone(id, isCluster){
+  if(!confirm('Delete this zone permanently?')) return;
+  const arr=isCluster?CLUSTERS:ZONES;
+  const idx=arr.findIndex(x=>x.id===id);
+  if(idx!==-1) arr.splice(idx,1);
+  const el=isCluster?clusterElMap[id]:zoneElMap[id];
+  if(el&&el.parentNode) el.parentNode.removeChild(el);
+  if(isCluster){ delete clusterOverrides[id]; delete clusterElMap[id]; }
+  else { delete zoneOverrides[id]; delete zoneElMap[id]; }
+  saveZoneData();
+  closeZoneEditForm();
+}
+
+function addNewZone(){
+  const vw=viewport.clientWidth,vh=viewport.clientHeight;
+  const cx=Math.round(originX+(vw/2)/scale), cy=Math.round(originY+(vh/2)/scale);
+  const id='zone_new_'+(nextZoneNum++);
+  const z={id,label:'New zone',sublabel:'',x:cx-200,y:cy-150,w:400,h:300,cls:'custom',_added:true};
+  ZONES.push(z);
+  const el=createZoneEl(z,false);
+  world.insertBefore(el,svg);
+  zoneElMap[id]=el;
+  applyZoneStyle(el,id,false);
+  saveZoneData();
+  openZoneEditForm(id,false);
+}
+
+function applyServerZoneData(data){
+  zoneOverrides=data.zones||{};
+  clusterOverrides=data.clusters||{};
+  (data.added||[]).forEach(z=>{ if(!ZONES.find(x=>x.id===z.id)) ZONES.push(z); });
+  (data.addedClusters||[]).forEach(c=>{ if(!CLUSTERS.find(x=>x.id===c.id)) CLUSTERS.push(c); });
+  applyZonePosOverrides();
+  Object.keys(zoneOverrides).forEach(id=>{ if(zoneElMap[id]) applyZoneStyle(zoneElMap[id],id,false); });
+  Object.keys(clusterOverrides).forEach(id=>{ if(clusterElMap[id]) applyZoneStyle(clusterElMap[id],id,true); });
+  ZONES.filter(z=>z._added&&!zoneElMap[z.id]).forEach(z=>{
+    const el=createZoneEl(z,false); world.insertBefore(el,svg); zoneElMap[z.id]=el; applyZoneStyle(el,z.id,false);
+  });
+  CLUSTERS.filter(c=>c._added&&!clusterElMap[c.id]).forEach(c=>{
+    const el=createZoneEl(c,true); world.insertBefore(el,svg); clusterElMap[c.id]=el; applyZoneStyle(el,c.id,true);
+  });
+}
+
+// ============================================================
+// INIT
+// ============================================================
+loadZoneData();
+applyOverridesToNodes();
+applyColorStyles();
+renderZones();
+renderClusters();
+renderNodes();
+renderEdges();
+applyTransform();
+setTimeout(fitAll, 50);
+
+// If a persistence server is configured, quietly check it for newer
+// data after the page has already rendered from local storage. This
+// keeps the wall fast (no waiting on a network request to see anything)
+// while still picking up your latest saved state from another device.
+if(SERVER_URL){
+  refreshOverridesFromServer();
+  refreshColorsAndPanelsFromServer();
+  refreshCreatedNodesFromServer();
+}
+
+</script>
+</body>
+</html>

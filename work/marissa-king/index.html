@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Marissa King | Private Chef & Catering — Roaring Fork Valley</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%236b8e6a'/><text x='32' y='43' font-family='Google Sans Flex,Helvetica,Arial,sans-serif' font-size='30' font-weight='700' fill='%23fff' text-anchor='middle'>MK</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,100..1000&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   MARISSA KING — Private Chef & Catering
+   Adapted from Carolynn Heil template
+   ── Edit :root to restyle ────────────────────────────────────
+═══════════════════════════════════════════════════════════════ */
+:root {
+  --mk-base:       #6b8e6a;   /* sage green — overridden by JS   */
+  --mk-comp:       #a8d5a8;   /* light sage complement           */
+  --mk-black:      #0e0e0e;
+  --mk-white:      #ffffff;
+  --mk-rule:       rgba(0,0,0,0.09);
+  --mk-muted:      rgba(14,14,14,0.68);   /* body copy          */
+  --mk-soft:       rgba(14,14,14,0.46);   /* captions, metadata */
+
+  --font-logo:     'Google Sans Flex', -apple-system, system-ui, sans-serif;
+  --font-body:     'Google Sans Flex', -apple-system, system-ui, sans-serif;
+  --font-display:  'Google Sans Flex', -apple-system, system-ui, sans-serif;
+
+  --header-h:      68px;
+  --bar-h:         52px;      /* height of the φ bar band        */
+  --content-pad:   clamp(1.5rem, 5vw, 4.5rem);
+  --max-w:         1160px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--mk-white);
+  color: var(--mk-black);
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* One editorial treatment for every section heading: a short accent
+   rule above it, the way a magazine marks a new department. */
+.gallery h2,
+.services h2,
+.process h2 {
+  font-size: clamp(1.45rem, 2.6vw, 1.95rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  color: var(--mk-black);
+  padding-top: 1.6rem;
+  position: relative;
+}
+
+.gallery h2::before,
+.services h2::before,
+.process h2::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 56px;
+  height: 3px;
+  background: var(--mk-base);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HEADER
+═══════════════════════════════════════════════════════════════ */
+header {
+  height: var(--header-h);
+  /* Three tracks - logo | title | nav - so the centre title has its own
+     space instead of being absolutely positioned across the whole bar. */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0 var(--content-pad);
+  background: var(--mk-white);
+  position: relative;
+  z-index: 100;
+  border-bottom: 1px solid var(--mk-rule);
+}
+
+header nav {
+  justify-self: end;
+}
+
+header .nav-toggle {
+  justify-self: end;
+}
+
+.mk-logo {
+  font-family: var(--font-logo);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 1000;
+  color: var(--mk-base);
+  text-decoration: none;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+.mk-logo:hover { opacity: 0.75; }
+
+.site-title {
+  font-family: var(--font-body);
+  font-size: clamp(0.66rem, 1.1vw, 0.78rem);
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--mk-soft);
+  white-space: nowrap;
+  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Below this the logo and nav need the whole bar to themselves. */
+@media (max-width: 1100px) {
+  header { grid-template-columns: 1fr auto; }
+  .site-title { display: none; }
+}
+
+nav {
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 2.5vw, 2rem);
+}
+nav a {
+  font-family: var(--font-body);
+  font-size: 0.80rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mk-black);
+  text-decoration: none;
+  opacity: 0.70;
+  transition: opacity 0.18s;
+}
+nav a:hover { opacity: 1; }
+nav a.nav-contact {
+  opacity: 1;
+  border: 1.5px solid var(--mk-black);
+  padding: 9px 20px;
+  border-radius: 2px;
+  transition: background 0.18s, color 0.18s;
+}
+nav a.nav-contact:hover {
+  background: var(--mk-black);
+  color: var(--mk-white);
+}
+
+/* Mobile */
+.nav-toggle {
+  display: none; flex-direction: column; gap: 5px;
+  background: none; border: none; cursor: pointer; padding: 4px;
+}
+.nav-toggle span { display: block; width: 22px; height: 1.5px; background: var(--mk-black); }
+
+@media (max-width: 640px) {
+  nav { display: none; }
+  nav.open {
+    display: flex; flex-direction: column; align-items: flex-start;
+    position: absolute; top: var(--header-h); left: 0; right: 0;
+    background: var(--mk-white); border-bottom: 1px solid var(--mk-rule);
+    padding: 1.4rem var(--content-pad); gap: 1.1rem; z-index: 99;
+  }
+  .nav-toggle { display: flex; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   φ BAR SECTION
+═══════════════════════════════════════════════════════════════ */
+.phi-bar-section {
+  width: 100%;
+  height: var(--bar-h);
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.phi-bar {
+  /* JS supplies --bar-width, --bar-color and --bar-index per bar;
+     everything about how the bar looks and moves is here. */
+  height: 100%;
+  width: 0;
+  flex: none;
+  display: block;
+  background: var(--bar-color, var(--mk-base));
+  transition: width 900ms cubic-bezier(0.25, 0.1, 0.25, 1);
+  transition-delay: calc(var(--bar-index, 0) * 70ms);
+}
+
+.phi-bar.is-open {
+  width: var(--bar-width, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phi-bar {
+    transition: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN CONTENT
+═══════════════════════════════════════════════════════════════ */
+main {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 0 var(--content-pad);
+}
+
+/* ── Hero ──────────────────────────────────────────────────── */
+.hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(2.5rem, 5vw, 5rem);
+  /* Stretch, so the picture fills its half; the text is centred against
+     it on its own. */
+  align-items: stretch;
+  padding: clamp(3.5rem, 7vw, 6rem) 0 clamp(3rem, 6vw, 5rem);
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.9s ease, transform 0.9s ease;
+}
+.hero.visible { opacity: 1; transform: translateY(0); }
+
+.hero-text {
+  align-self: center;
+}
+
+.hero-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--mk-base);
+  margin-bottom: 1.1rem;
+  display: block;
+}
+
+.hero-headline {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 3.6vw, 2.9rem);
+  font-weight: 400;
+  line-height: 1.14;
+  letter-spacing: -0.022em;
+  color: var(--mk-black);
+  margin-bottom: 1.6rem;
+  text-wrap: balance;
+}
+.hero-headline strong {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  display: block;
+}
+
+.hero-body {
+  font-size: 1.02rem;
+  font-weight: 400;
+  line-height: 1.72;
+  color: var(--mk-muted);
+  max-width: 44ch;
+  margin-bottom: 2rem;
+}
+
+.hero-location {
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  color: var(--mk-muted);
+  margin-bottom: 2.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.hero-location::before {
+  content: '';
+  display: inline-block;
+  width: 18px; height: 1px;
+  background: var(--mk-muted);
+}
+
+.hero-collab {
+  font-size: 1.1rem;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--mk-base);
+  margin-bottom: 1.4rem;
+  letter-spacing: 0.02em;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn {
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 13px 24px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.18s;
+  display: inline-block;
+  border: none;
+}
+.btn-dark {
+  background: var(--mk-black);
+  color: var(--mk-white);
+  border: 1.5px solid var(--mk-black);
+}
+.btn-dark:hover { background: var(--mk-base); border-color: var(--mk-base); }
+.btn-outline {
+  background: transparent;
+  color: var(--mk-black);
+  border: 1.5px solid rgba(14,14,14,0.22);
+}
+.btn-outline:hover { border-color: var(--mk-black); }
+
+/* ── Hero right — image placeholder ────────────────────────── */
+.hero-image {
+  width: 100%;
+  /* Fills the grid row; the min-height is what makes the row tall enough
+     to be worth half the page when the copy is short. */
+  height: 100%;
+  min-height: clamp(360px, 44vw, 620px);
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+  /* The gradient is the fallback: an inline background-image overrides
+     it whenever a photo is set, here or from the admin panel. */
+  background-color: var(--mk-base);
+  background-image: linear-gradient(135deg, var(--mk-base) 0%, var(--mk-comp) 100%);
+  background-size: cover;
+  background-position: center;
+}
+
+/* ── Rule ─────────────────────────────────────────────────── */
+.rule {
+  width: 100%;
+  height: 1px;
+  background: var(--mk-rule);
+  margin: 0;
+}
+
+/* ── Gallery ───────────────────────────────────────────────── */
+.gallery {
+  padding: clamp(3rem, 6vw, 5rem) 0;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.9s ease 0.08s, transform 0.9s ease 0.08s;
+}
+.gallery.visible { opacity: 1; transform: translateY(0); }
+
+.gallery h2 {
+  /* Size, weight and the accent rule come from the shared heading rule
+     near the top; only the spacing differs per section. */
+  margin-bottom: 0.8rem;
+}
+
+.gallery-intro {
+  font-size: 1.02rem;
+  font-weight: 400;
+  line-height: 1.75;
+  color: var(--mk-muted);
+  max-width: 60ch;
+  margin-bottom: 2.5rem;
+}
+
+.gallery-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-bottom: 2.5rem;
+}
+
+.gallery-filter-btn {
+  padding: 0.6rem 1.2rem;
+  border: 1px solid var(--mk-rule);
+  background: transparent;
+  color: var(--mk-black);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.18s;
+}
+
+.gallery-filter-btn:hover {
+  border-color: var(--mk-base);
+  color: var(--mk-base);
+}
+
+.gallery-filter-btn.active {
+  background: var(--mk-base);
+  color: var(--mk-white);
+  border-color: var(--mk-base);
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.8rem;
+}
+
+.gallery-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+  aspect-ratio: 4 / 3;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.gallery-image {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  transition: transform 0.4s ease;
+}
+
+.gallery-item:hover .gallery-image {
+  transform: scale(1.06);
+}
+
+.gallery-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+  color: var(--mk-white);
+  padding: 1.5rem 1.2rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+/* ── Services ─────────────────────────────────────────────── */
+.services {
+  padding: clamp(3rem, 6vw, 5rem) 0;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.9s ease 0.1s, transform 0.9s ease 0.1s;
+}
+.services.visible { opacity: 1; transform: translateY(0); }
+
+.services h2 {
+  /* Size, weight and the accent rule come from the shared heading rule
+     near the top; only the spacing differs per section. */
+  margin-bottom: 2.2rem;
+}
+
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2.2rem;
+}
+
+.service-card {
+  border: 1px solid var(--mk-rule);
+  border-radius: 2px;
+  transition: all 0.18s;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.service-card:hover {
+  border-color: var(--mk-base);
+  transform: translateY(-2px);
+}
+
+.service-card-image {
+  width: 100%;
+  height: 200px;
+  background-size: cover;
+  background-position: center;
+  flex-shrink: 0;
+}
+
+.service-card-content {
+  padding: 1.8rem;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.service-card h3 {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mk-base);
+  margin-bottom: 0.8rem;
+}
+
+.service-card p {
+  font-size: 0.97rem;
+  font-weight: 400;
+  line-height: 1.68;
+  color: var(--mk-muted);
+}
+
+/* ── Collab band ────────────────────────────────────────── */
+.collab-band {
+  background: var(--mk-base);
+  padding: clamp(2.5rem, 5vw, 4rem) var(--content-pad);
+  text-align: center;
+  margin: clamp(3rem, 6vw, 5rem) 0;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.9s ease 0.15s, transform 0.9s ease 0.15s;
+}
+.collab-band.visible { opacity: 1; transform: translateY(0); }
+
+.collab-saying {
+  font-family: var(--font-body);
+  font-size: clamp(1.6rem, 4vw, 3rem);
+  font-weight: 300;
+  font-style: italic;
+  color: var(--mk-white);
+  letter-spacing: 0.01em;
+  margin-bottom: 1.6rem;
+}
+.collab-saying em {
+  font-style: normal;
+  font-weight: 600;
+}
+
+.collab-btn {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mk-base);
+  background: var(--mk-white);
+  border: none;
+  padding: 14px 32px;
+  border-radius: 2px;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+.collab-btn:hover { opacity: 0.88; }
+
+/* ── Process/Experience ───────────────────────────────────── */
+.process {
+  padding: clamp(3rem, 6vw, 5rem) 0;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.9s ease 0.2s, transform 0.9s ease 0.2s;
+}
+.process.visible { opacity: 1; transform: translateY(0); }
+
+.process h2 {
+  /* Size, weight and the accent rule come from the shared heading rule
+     near the top; only the spacing differs per section. */
+  margin-bottom: 2.2rem;
+}
+
+.experience-item {
+  padding: 2rem 0;
+  border-bottom: 1px solid var(--mk-rule);
+}
+.experience-item:last-child {
+  border-bottom: none;
+}
+
+.experience-item h3 {
+  font-size: 1.1rem;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+  margin-bottom: 0.4rem;
+  color: var(--mk-black);
+}
+
+.experience-item .role {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mk-base);
+  margin-bottom: 0.8rem;
+  display: block;
+}
+
+.experience-item ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.8rem 0 0 0;
+}
+
+.experience-item li {
+  font-size: 0.97rem;
+  font-weight: 400;
+  line-height: 1.66;
+  color: var(--mk-muted);
+  margin-bottom: 0.5rem;
+  padding-left: 1.2rem;
+  position: relative;
+}
+.experience-item li::before {
+  content: '–';
+  position: absolute;
+  left: 0;
+  color: var(--mk-base);
+}
+
+@media (max-width: 768px) {
+  .hero { grid-template-columns: 1fr; gap: 2.5rem; }
+
+  /* Once stacked there is no row to fill, so give it a proportion and let
+     it scale with the viewport. */
+  .hero-image {
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 4 / 3;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════════════════════════ */
+footer {
+  background: var(--mk-black);
+  color: var(--mk-white);
+  padding: clamp(3rem,6vw,5rem) var(--content-pad) clamp(1.5rem,3vw,2.5rem);
+  margin-top: clamp(3rem, 6vw, 5rem);
+}
+
+.footer-inner {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 3rem;
+  padding-bottom: 3rem;
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+}
+
+.footer-logo {
+  font-family: var(--font-logo);
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--mk-base);
+  display: block;
+  margin-bottom: 0.9rem;
+  text-decoration: none;
+}
+
+.footer-name {
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.55);
+  margin-bottom: 0.6rem;
+  display: block;
+}
+
+.footer-tagline {
+  font-size: 0.82rem;
+  font-weight: 300;
+  font-style: italic;
+  line-height: 1.65;
+  color: rgba(255,255,255,0.40);
+}
+
+.footer-col-title {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+  margin-bottom: 1.2rem;
+  display: block;
+}
+
+.footer-links { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+.footer-links a {
+  font-size: 0.82rem;
+  font-weight: 300;
+  color: rgba(255,255,255,0.65);
+  text-decoration: none;
+  transition: color 0.18s;
+}
+.footer-links a:hover { color: var(--mk-base); }
+
+.footer-bottom {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 1.8rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.footer-copy {
+  font-size: 0.68rem;
+  font-weight: 300;
+  color: rgba(255,255,255,0.28);
+  letter-spacing: 0.06em;
+}
+
+.footer-location {
+  font-size: 0.68rem;
+  font-weight: 300;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.28);
+}
+
+@media (max-width: 640px) {
+  .footer-inner { grid-template-columns: 1fr; gap: 2rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ HEADER ════════════════════════════════════════════════ -->
+<header>
+  <a href="index.html" class="mk-logo" id="mk-logo">MK</a>
+  <span class="site-title">Marissa King · Private Chef</span>
+  <nav id="main-nav">
+    <a href="index.html#services">Services</a>
+    <a href="pricing.html">Pricing</a>
+    <a href="index.html#experience">Experience</a>
+    <a href="#contact" class="nav-contact">Contact</a>
+  </nav>
+  <button class="nav-toggle" id="nav-toggle" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</header>
+
+<!-- ═══ φ BARS ════════════════════════════════════════════════ -->
+<div class="phi-bar-section" id="phi-bar-section" aria-hidden="true">
+  <!-- bars generated by JS -->
+</div>
+
+<!-- ═══ MAIN ══════════════════════════════════════════════════ -->
+<main>
+
+  <!-- Hero -->
+  <section class="hero" id="hero">
+    <div class="hero-text">
+      <span class="hero-eyebrow">Private Chef · Roaring Fork Valley</span>
+      <h1 class="hero-headline">
+        Personalized seasonal cuisine<br>
+        <strong>for your gatherings</strong>
+      </h1>
+      <p class="hero-location">Basalt · Aspen · Snowmass · Carbondale</p>
+      <p class="hero-body">
+        With 20+ years of culinary, catering, and food-service leadership, I create personalized seasonal menus from locally sourced ingredients. From intimate private dinners to high-end celebrations, every meal is tailored to your preferences, dietary needs, and the freshest offerings of the season.
+      </p>
+      <p class="hero-collab">Let's collaborate —</p>
+      <div class="hero-actions">
+        <a href="#contact" class="btn btn-dark">Start a Conversation</a>
+        <a href="#services" class="btn btn-outline">View Services</a>
+      </div>
+    </div>
+
+    <div class="hero-image" id="hero-image" style="background-image: url('https://images.pexels.com/photos/6125822/pexels-photo-6125822.jpeg?auto=compress&cs=tinysrgb&w=1200'); background-size: cover; background-position: center;"></div>
+  </section>
+
+  <hr class="rule">
+
+  <!-- Photo Gallery -->
+  <section class="gallery" id="gallery">
+    <h2>Events & Table Settings</h2>
+    <p class="gallery-intro">From intimate dinners to mountain celebrations—each table tells a story.</p>
+
+    <!-- Gallery Filters -->
+    <div class="gallery-filters">
+      <button class="gallery-filter-btn active" data-filter="all">All</button>
+      <button class="gallery-filter-btn" data-filter="intimate-dinner">Intimate Dinner</button>
+      <button class="gallery-filter-btn" data-filter="formal-event">Formal Event</button>
+      <button class="gallery-filter-btn" data-filter="mountain-gathering">Mountain Gathering</button>
+      <button class="gallery-filter-btn" data-filter="private-celebration">Private Celebration</button>
+    </div>
+
+    <div class="gallery-grid">
+      <div class="gallery-item" data-category="intimate-dinner">
+        <div class="gallery-image" style="background-image: url('https://images.pexels.com/photos/28059316/pexels-photo-28059316.jpeg?auto=compress&cs=tinysrgb&w=800');"></div>
+        <div class="gallery-label">Intimate Dinner</div>
+      </div>
+      <div class="gallery-item" data-category="formal-event">
+        <div class="gallery-image" style="background-image: url('https://images.pexels.com/photos/4639508/pexels-photo-4639508.jpeg?auto=compress&cs=tinysrgb&w=800');"></div>
+        <div class="gallery-label">Formal Event</div>
+      </div>
+      <div class="gallery-item" data-category="mountain-gathering">
+        <div class="gallery-image" style="background-image: url('https://images.pexels.com/photos/5864498/pexels-photo-5864498.jpeg?auto=compress&cs=tinysrgb&w=800');"></div>
+        <div class="gallery-label">Mountain Gathering</div>
+      </div>
+      <div class="gallery-item" data-category="private-celebration">
+        <div class="gallery-image" style="background-image: url('https://images.pexels.com/photos/16120234/pexels-photo-16120234.jpeg?auto=compress&cs=tinysrgb&w=800');"></div>
+        <div class="gallery-label">Private Celebration</div>
+      </div>
+      <div class="gallery-item" data-category="formal-event">
+        <div class="gallery-image" style="background-image: url('https://images.pexels.com/photos/8112907/pexels-photo-8112907.jpeg?auto=compress&cs=tinysrgb&w=800');"></div>
+        <div class="gallery-label">Fine Dining Detail</div>
+      </div>
+      <div class="gallery-item" data-category="intimate-dinner">
+        <div class="gallery-image" style="background-image: url('https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?auto=compress&cs=tinysrgb&w=800');"></div>
+        <div class="gallery-label">Seasonal Menu</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Services -->
+  <section class="services" id="services">
+    <h2>What I Offer</h2>
+    <div class="services-grid">
+      <div class="service-card">
+        <div class="service-card-image" style="background-image: url('https://images.pexels.com/photos/2977514/pexels-photo-2977514.jpeg?auto=compress&cs=tinysrgb&w=600');"></div>
+        <div class="service-card-content">
+          <h3>Private Chef & Family Meal Service</h3>
+          <p>Personalized menus for individuals and families, from intimate dinners to multi-course private events. Complete culinary management with professional discretion and reliability.</p>
+        </div>
+      </div>
+      <div class="service-card">
+        <div class="service-card-image" style="background-image: url('https://images.pexels.com/photos/1092730/pexels-photo-1092730.jpeg?auto=compress&cs=tinysrgb&w=600');"></div>
+        <div class="service-card-content">
+          <h3>Seasonal & Locally Sourced Cuisine</h3>
+          <p>Menus designed around what's fresh and available, with thoughtful accommodation for dietary preferences, allergies, and nutritional requirements.</p>
+        </div>
+      </div>
+      <div class="service-card">
+        <div class="service-card-image" style="background-image: url('https://images.pexels.com/photos/30469688/pexels-photo-30469688.jpeg?auto=compress&cs=tinysrgb&w=600');"></div>
+        <div class="service-card-content">
+          <h3>Event & Dinner Party Execution</h3>
+          <p>High-end catering for weddings, celebrations, and community gatherings throughout the Roaring Fork Valley, from coordination to impeccable service.</p>
+        </div>
+      </div>
+      <div class="service-card">
+        <div class="service-card-image" style="background-image: url('https://images.pexels.com/photos/6283970/pexels-photo-6283970.jpeg?auto=compress&cs=tinysrgb&w=600');"></div>
+        <div class="service-card-content">
+          <h3>Kitchen Organization & Management</h3>
+          <p>Complete meal planning, grocery shopping, ingredient sourcing, food preparation, and professional kitchen organization and maintenance.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Collaborate -->
+  <section class="collab-band" id="collaborate">
+    <p class="collab-saying">Every meal <em>reflects your life</em> — your tastes, your time, your table.</p>
+    <a href="#contact" class="collab-btn">Let's Talk</a>
+  </section>
+
+  <!-- Experience -->
+  <section class="process" id="experience">
+    <h2>Background & Expertise</h2>
+
+    <div class="experience-item">
+      <h3>Private Chef</h3>
+      <span class="role">Self-Employed — Basalt, CO | October 2020–Present</span>
+      <ul>
+        <li>Provide customized private-chef services for families and individuals</li>
+        <li>Design menus based on preferences, dietary needs, and seasonal availability</li>
+        <li>Manage all aspects: sourcing, preparation, service, and kitchen organization</li>
+        <li>Build trusted relationships through consistency, discretion, and attention to detail</li>
+      </ul>
+    </div>
+
+    <div class="experience-item">
+      <h3>Preparatory Cook & Back-of-House Captain</h3>
+      <span class="role">European Catering — Basalt, CO | May 2022–Present</span>
+      <ul>
+        <li>Execute high-end weddings, private celebrations, and holiday events with precision</li>
+        <li>Coordinate back-of-house preparation and establish efficient kitchen workflow</li>
+        <li>Work closely with culinary teams to meet demanding service timelines without sacrificing quality</li>
+        <li>Maintain strict food-safety and quality standards in fast-paced event environments</li>
+      </ul>
+    </div>
+
+    <div class="experience-item">
+      <h3>Culinary Leadership & Supervision</h3>
+      <span class="role">Whole Foods Market — Basalt, CO | May 2010–May 2023</span>
+      <ul>
+        <li>Progressively responsible roles: Prepared Foods Catering Supervisor, Seafood Team Buyer, Culinary Trainer</li>
+        <li>Managed catering operations including Aspen Food & Wine Festival and Crown Mountain Lacrosse Tournament</li>
+        <li>Trained culinary employees in recipes, preparation, food safety, and presentation standards</li>
+        <li>Supervised kitchen teams and coordinated multiple food-production stations</li>
+      </ul>
+    </div>
+
+    <div class="experience-item">
+      <h3>Education & Certification</h3>
+      <span class="role">Associate of Arts in Culinary Arts, The Art Institute of Colorado (2004)</span>
+      <ul>
+        <li>Warren Tech Vocational Program · Peer-selected Class Sous Chef</li>
+        <li>ServSafe Certified (2019)</li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══ FOOTER ════════════════════════════════════════════════ -->
+<footer id="contact">
+  <div class="footer-inner">
+    <div>
+      <a href="index.html" class="footer-logo">MK</a>
+      <span class="footer-name">Marissa King</span>
+      <p class="footer-tagline">Personalized seasonal cuisine for your gatherings, celebrations, and private dining occasions in the Roaring Fork Valley.</p>
+    </div>
+    <div>
+      <span class="footer-col-title">Navigate</span>
+      <ul class="footer-links">
+        <li><a href="index.html#services">Services</a></li>
+        <li><a href="pricing.html">Pricing</a></li>
+        <li><a href="index.html#experience">Experience</a></li>
+      </ul>
+    </div>
+    <div>
+      <span class="footer-col-title">Contact</span>
+      <ul class="footer-links">
+        <li><a href="tel:720-219-1331">Call or Text</a></li>
+        <li><a href="mailto:Marmark1331@gmail.com">Email</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p class="footer-copy">© 2026 Marissa King. All rights reserved.</p>
+    <p class="footer-location">Aspen · Basalt · Roaring Fork Valley · Colorado</p>
+  </div>
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// φ BAR ANIMATION & SCROLL REVEAL
+// ═══════════════════════════════════════════════════════════════
+
+// ─── colour maths (OKLCH) ──────────────────────────────────────
+// Same approach as the bar on Carolynn Heil's site: work in OKLCH so
+// the tonal steps stay perceptually even, and derive the whole ramp
+// from one colour instead of hand-picking hexes.
+
+const PHI = (1 + Math.sqrt(5)) / 2;
+
+function oklchToHex(L, C, H) {
+  L = Math.max(0, Math.min(1, L));
+  C = Math.max(0, C);
+  const hr = (H * Math.PI) / 180;
+  const a = C * Math.cos(hr);
+  const b = C * Math.sin(hr);
+
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+  const lv = l_ * l_ * l_;
+  const mv = m_ * m_ * m_;
+  const sv = s_ * s_ * s_;
+
+  const R = 4.0767416621 * lv - 3.3077115913 * mv + 0.2309699292 * sv;
+  const G = -1.2684380046 * lv + 2.6097574011 * mv - 0.3413193965 * sv;
+  const B = -0.0041960863 * lv - 0.7034186147 * mv + 1.7076147010 * sv;
+
+  const gamma = (x) => (x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(Math.max(0, x), 1 / 2.4) - 0.055);
+  const hex = (x) => Math.round(Math.max(0, Math.min(1, gamma(x))) * 255).toString(16).padStart(2, '0');
+
+  return '#' + hex(R) + hex(G) + hex(B);
+}
+
+function rgbToOklch(r, g, b) {
+  const lin = (x) => (x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4));
+  r = lin(r / 255);
+  g = lin(g / 255);
+  b = lin(b / 255);
+
+  const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+  const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+  const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+
+  const l_ = Math.cbrt(l);
+  const m_ = Math.cbrt(m);
+  const s_ = Math.cbrt(s);
+
+  const A = 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_;
+  const Bv = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_;
+  const L = 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_;
+
+  return { L, C: Math.sqrt(A * A + Bv * Bv), H: ((Math.atan2(Bv, A) * 180) / Math.PI + 360) % 360 };
+}
+
+// Nine tonal steps, light to dark, chroma peaking in the middle.
+const TONAL_STEPS = [
+  { L: 0.965, c: 0.15 }, { L: 0.890, c: 0.35 }, { L: 0.790, c: 0.58 },
+  { L: 0.690, c: 0.80 }, { L: 0.590, c: 1.00 }, { L: 0.480, c: 0.82 },
+  { L: 0.370, c: 0.65 }, { L: 0.255, c: 0.45 }, { L: 0.145, c: 0.22 },
+];
+
+function buildFamily(H, maxC, anchorL) {
+  const shift = anchorL - 0.590;
+  return TONAL_STEPS.map((step) =>
+    oklchToHex(Math.max(0.04, Math.min(0.97, step.L + shift)), maxC * step.c, H)
+  );
+}
+
+// --mk-base may be a hex or an hsl() from /api/styles, so let the
+// browser resolve it rather than parsing colour syntax ourselves.
+function resolveAccent() {
+  const probe = document.createElement('span');
+  probe.style.cssText = 'position:absolute;visibility:hidden;color:var(--mk-base)';
+  document.body.appendChild(probe);
+  const computed = getComputedStyle(probe).color;
+  probe.remove();
+
+  const m = /(\d+(?:\.\d+)?)\s*,?\s*(\d+(?:\.\d+)?)\s*,?\s*(\d+(?:\.\d+)?)/.exec(computed);
+  return m ? { r: +m[1], g: +m[2], b: +m[3] } : { r: 107, g: 142, b: 106 };
+}
+
+// The ramp: three analogous families 30° apart, read across their
+// tonal levels. Analogous rather than complementary, so the band reads
+// as one accent deepening rather than two colours competing.
+function barColors() {
+  const { r, g, b } = resolveAccent();
+  const { H, C, L } = rgbToOklch(r, g, b);
+  const maxC = Math.min(0.24, Math.max(C * 1.1, 0.13));
+
+  const near = buildFamily(H, maxC, L);
+  const up = buildFamily((H + 30) % 360, maxC, L);
+  const down = buildFamily((H - 30 + 360) % 360, maxC, L);
+
+  return [
+    near[4], up[5], near[7], down[3], up[4], near[2],
+    down[6], up[7], near[5], down[4], up[2], near[6],
+  ];
+}
+
+// ─── the band ──────────────────────────────────────────────────
+// Bar 1 is 45% of the viewport; each next bar is the previous ÷ φ.
+// Keep going until they fill the width, so the band extends all the
+// way across instead of stopping after two bars.
+
+function initPhiBars() {
+  const section = document.getElementById('phi-bar-section');
+  if (!section) return;
+
+  const colors = barColors();
+  const vw = window.innerWidth;
+  const MIN_PX = 2;
+
+  const widths = [];
+  let w = vw * 0.45;
+  let sum = 0;
+  while (sum < vw && w >= MIN_PX) {
+    const width = Math.min(w, vw - sum);
+    widths.push(width);
+    sum += width;
+    w /= PHI;
+  }
+
+  // Any sliver left over from the geometric series goes to the last bar
+  // so the band always reaches the right edge.
+  if (widths.length && sum < vw) widths[widths.length - 1] += vw - sum;
+
+  section.textContent = '';
+  const bars = widths.map((width, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'phi-bar';
+    bar.style.setProperty('--bar-width', width.toFixed(2) + 'px');
+    bar.style.setProperty('--bar-color', colors[i % colors.length]);
+    bar.style.setProperty('--bar-index', String(i));
+    section.appendChild(bar);
+    return bar;
+  });
+
+  // Flush layout so the transition has a 0 width to start from, then
+  // open. Deliberately not requestAnimationFrame: it does not fire while
+  // the tab is in the background, which leaves the band collapsed until
+  // the tab is focused.
+  void section.offsetWidth;
+  bars.forEach((bar) => bar.classList.add('is-open'));
+}
+
+let barResizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(barResizeTimer);
+  barResizeTimer = setTimeout(initPhiBars, 150);
+});
+
+// Scroll reveal animations
+const revealElements = document.querySelectorAll('.hero, .gallery, .services, .process, .collab-band');
+const revealOptions = {
+  threshold: 0.15,
+  rootMargin: '0px 0px -100px 0px'
+};
+
+const revealOnScroll = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      revealOnScroll.unobserve(entry.target);
+    }
+  });
+}, revealOptions);
+
+revealElements.forEach(el => revealOnScroll.observe(el));
+
+// Mobile navigation toggle
+const navToggle = document.getElementById('nav-toggle');
+const mainNav = document.getElementById('main-nav');
+
+if (navToggle && mainNav) {
+  navToggle.addEventListener('click', () => {
+    mainNav.classList.toggle('open');
+  });
+}
+
+// Gallery filtering
+const filterBtns = document.querySelectorAll('.gallery-filter-btn');
+const galleryItems = document.querySelectorAll('.gallery-item');
+
+if (filterBtns.length && galleryItems.length) {
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const filter = btn.getAttribute('data-filter');
+
+      // Update active button
+      filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // Filter items
+      galleryItems.forEach(item => {
+        const category = item.getAttribute('data-category');
+        if (filter === 'all' || category === filter) {
+          item.style.display = 'block';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    });
+  });
+}
+
+// Initialize
+initPhiBars();
+
+// Load color settings
+function loadSettings() {
+  try {
+    const settings = window.__MK_STYLES__;
+    if (settings && settings.accentHue !== undefined) {
+      const h = settings.accentHue;
+      const s = settings.accentSat || 35;
+      const l = settings.accentLight || 42;
+      document.documentElement.style.setProperty('--mk-base', `hsl(${h}, ${s}%, ${l}%)`);
+    }
+  } catch (e) {
+    console.error('Error loading settings:', e);
+  }
+}
+
+// Load admin data and populate page dynamically
+function loadAdminData() {
+  try {
+    const data = window.__MK_CONTENT__;
+    if (!data) return; // Nothing published yet - use the hardcoded defaults
+
+    // Update hero section
+    if (data.hero) {
+      const heroEyebrow = document.querySelector('.hero-eyebrow');
+      const heroHeadline = document.querySelector('.hero-headline');
+      const heroImage = document.getElementById('hero-image');
+
+      if (heroEyebrow && data.hero.eyebrow) {
+        heroEyebrow.textContent = data.hero.eyebrow;
+      }
+      if (heroHeadline && data.hero.headline) {
+        heroHeadline.innerHTML = data.hero.headline.split('\n').join('<br>');
+      }
+      if (heroImage && data.hero.image) {
+        heroImage.style.backgroundImage = `url('${data.hero.image}')`;
+      }
+    }
+
+    // Update gallery section
+    if (data.gallery && data.gallery.items) {
+      const galleryGrid = document.querySelector('.gallery-grid');
+      if (galleryGrid) {
+        galleryGrid.innerHTML = '';
+        data.gallery.items.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'gallery-item';
+          div.setAttribute('data-category', item.category || 'all');
+          div.innerHTML = `
+            <div class="gallery-image" style="background-image: url('${item.image}');"></div>
+            <div class="gallery-label">${item.label}</div>
+          `;
+          galleryGrid.appendChild(div);
+        });
+      }
+    }
+
+    // Update services section
+    if (data.services && Array.isArray(data.services)) {
+      const servicesGrid = document.querySelector('.services-grid');
+      if (servicesGrid) {
+        servicesGrid.innerHTML = '';
+        data.services.forEach(service => {
+          const div = document.createElement('div');
+          div.className = 'service-card';
+          div.innerHTML = `
+            <div class="service-card-image" style="background-image: url('https://images.pexels.com/photos/2977514/pexels-photo-2977514.jpeg?auto=compress&cs=tinysrgb&w=600');"></div>
+            <div class="service-card-content">
+              <h3>${service.title}</h3>
+              <p>${service.description}</p>
+            </div>
+          `;
+          servicesGrid.appendChild(div);
+        });
+      }
+    }
+
+    // Update experience section
+    if (data.experience && Array.isArray(data.experience.items)) {
+      const processSection = document.getElementById('experience');
+      if (processSection) {
+        processSection.textContent = '';
+
+        const heading = document.createElement('h2');
+        heading.textContent = data.experience.title || 'Background & Expertise';
+        processSection.append(heading);
+
+        for (const item of data.experience.items) {
+          // First line is the employer and dates; the rest are bullets.
+          const lines = String(item.description || '')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean);
+
+          const bullets = lines
+            .filter((line) => line.startsWith('•'))
+            .map((line) => line.replace(/^•\s*/, ''));
+          const subtitle = lines.find((line) => !line.startsWith('•')) || '';
+
+          const wrap = document.createElement('div');
+          wrap.className = 'experience-item';
+
+          const role = document.createElement('h3');
+          role.textContent = item.title || item.role || '';
+          wrap.append(role);
+
+          if (subtitle) {
+            const where = document.createElement('span');
+            where.className = 'role';
+            where.textContent = subtitle;
+            wrap.append(where);
+          }
+
+          if (bullets.length) {
+            const ul = document.createElement('ul');
+            for (const bullet of bullets) {
+              const li = document.createElement('li');
+              li.textContent = bullet;
+              ul.append(li);
+            }
+            wrap.append(ul);
+          }
+
+          processSection.append(wrap);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error loading admin data:', e);
+  }
+}
+
+// Content and colours come from the server (see server.js), so what a
+// visitor sees matches what Marissa saved in the admin panel - on any
+// device, in any browser.
+async function hydrate() {
+  const grab = (url) =>
+    fetch(url)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null);
+
+  const [content, styles] = await Promise.all([grab('/api/content'), grab('/api/styles')]);
+
+  window.__MK_CONTENT__ = content && Object.keys(content).length ? content : null;
+  window.__MK_STYLES__ = styles && Object.keys(styles).length ? styles : null;
+
+  loadAdminData();
+  loadSettings();
+  initPhiBars();
+}
+
+hydrate();
+
+// Re-hydrate only when the page is restored from the back/forward cache;
+// a plain load has already fetched above.
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) hydrate();
+});
+</script>
+</body>
+</html>

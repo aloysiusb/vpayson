@@ -1,0 +1,3638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Investigation wall — live demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,400..1000&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* Static demo shim.
+   The real build runs behind a small Express server that proxies geocoding,
+   feeds and saves. This copy is a single file on static hosting, so the one
+   endpoint the page still needs is answered here from baked coordinates and
+   the rest are allowed to fail, which the page already handles: saves fall
+   back to this browser's localStorage, and the feed sections are switched off
+   in their config above. Coordinates are approximate centres, which is all the
+   map needs. */
+(function(){
+  var BAKED = {
+    'new york harbor, new york, ny':        {lat:40.6895, lon:-74.0450, label:'New York Harbor, New York'},
+    'santa maria island, azores, portugal': {lat:36.9833, lon:-25.1000, label:'Santa Maria, Azores, Portugal'},
+    'gibraltar':                            {lat:36.1408, lon:-5.3536,  label:'Gibraltar'},
+    'genoa, italy':                         {lat:44.4056, lon:8.9463,   label:'Genoa, Liguria, Italy'},
+    'spencers island, nova scotia, canada': {lat:45.3833, lon:-64.7000, label:"Spencer's Island, Nova Scotia, Canada"},
+    'rochelois bank, haiti':                {lat:18.5500, lon:-73.1500, label:'Rochelois Bank, Gulf of Gon\u00e2ve, Haiti'}
+  };
+  var _fetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    var url = (typeof input === 'string') ? input : (input && input.url) || '';
+    if(url.indexOf('/api/geocode') !== -1){
+      var q = '';
+      try{
+        q = new URLSearchParams(url.slice(url.indexOf('?') + 1)).get('q') || '';
+      }catch(e){ q = ''; }
+      var hit = BAKED[q.trim().toLowerCase()] || null;
+      return Promise.resolve(new Response(JSON.stringify(hit), {
+        status: 200, headers: {'Content-Type':'application/json'}
+      }));
+    }
+    return _fetch(input, init);
+  };
+})();
+</script>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --board-bg: #f3f1ec; --board-dot: #e3ddcc; }
+html { font-size: 17px; }
+html, body, button, input, select, textarea {
+  font-family: 'Google Sans Flex', 'Google Sans Flex Placeholder', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+html, body { width: 100%; background: var(--board-bg); }
+body { overflow-x: hidden; font-size: 1rem; }
+
+#viewport {
+  width: 100vw; height: 100vh; position: relative; overflow: hidden;
+  cursor: grab; background: var(--board-bg);
+  background-image: radial-gradient(circle, var(--board-dot) 1px, transparent 1px);
+  background-size: 26px 26px;
+  /* without this, a mobile browser's native page pinch-zoom competes with
+     (and usually wins over) the touchstart/touchmove pinch handler below —
+     this hands the whole gesture to JS instead, just for this element */
+  touch-action: none;
+}
+#viewport.panning { cursor: grabbing; }
+
+#world {
+  position: absolute; top: 0; left: 0;
+  transform-origin: 0 0;
+  width: 5000px; height: 2550px;
+}
+
+svg#lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible; }
+
+/* ===== Zone backgrounds ===== */
+.zone {
+  position: absolute; border-radius: 32px; z-index: 0;
+  display: flex; align-items: flex-start; justify-content: flex-start;
+}
+.zone .zone-label {
+  position: absolute; top: 18px; left: 28px;
+  font-size: 15px; font-weight: 700; letter-spacing: .02em;
+}
+.zone .zone-sublabel {
+  position: absolute; top: 40px; left: 28px;
+  font-size: 10.5px; opacity: .75;
+}
+.zone.corporate { background: rgba(55, 138, 221, 0.08); border: 2px dashed rgba(55, 138, 221, 0.35); }
+.zone.corporate .zone-label, .zone.corporate .zone-sublabel { color: #0c447c; }
+.zone.legallymine { background: rgba(216, 90, 48, 0.08); border: 2px dashed rgba(216, 90, 48, 0.35); }
+.zone.legallymine .zone-label, .zone.legallymine .zone-sublabel { color: #993c1d; }
+
+/* ===== Sub-cluster tint regions ===== */
+.cluster {
+  position: absolute; border-radius: 20px; z-index: 0;
+  pointer-events: none;
+}
+.cluster .cluster-label {
+  position: absolute; top: 8px; left: 14px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; opacity: .8;
+}
+/* corporate zone clusters — cool blue family, distinguished by hue/tint */
+.cluster.cl-officers   { background: rgba(55, 138, 221, 0.07);  border: 1.5px dashed rgba(55, 138, 221, 0.30); }
+.cluster.cl-officers .cluster-label { color: #0c447c; }
+.cluster.cl-delaware   { background: rgba(58, 180, 130, 0.08);  border: 1.5px dashed rgba(58, 180, 130, 0.32); }
+.cluster.cl-delaware .cluster-label { color: #1a6b46; }
+.cluster.cl-storeweb   { background: rgba(255, 153, 51, 0.07);  border: 1.5px dashed rgba(255, 153, 51, 0.32); }
+.cluster.cl-storeweb .cluster-label { color: #8a4a00; }
+.cluster.cl-fdd        { background: rgba(133, 79, 11, 0.07);   border: 1.5px dashed rgba(133, 79, 11, 0.30); }
+.cluster.cl-fdd .cluster-label { color: #5c3508; }
+.cluster.cl-gap        { background: rgba(224, 96, 96, 0.08);   border: 1.5px dashed rgba(224, 96, 96, 0.32); }
+.cluster.cl-gap .cluster-label { color: #8a1f1f; }
+
+/* legally mine zone clusters — warm coral/purple family */
+.cluster.cl-people     { background: rgba(123, 77, 171, 0.08);  border: 1.5px dashed rgba(123, 77, 171, 0.32); }
+.cluster.cl-people .cluster-label { color: #4a2a72; }
+.cluster.cl-renames    { background: rgba(216, 90, 48, 0.08);   border: 1.5px dashed rgba(216, 90, 48, 0.32); }
+.cluster.cl-renames .cluster-label { color: #993c1d; }
+.cluster.cl-entityweb  { background: rgba(55, 138, 221, 0.06);  border: 1.5px dashed rgba(55, 138, 221, 0.28); }
+.cluster.cl-entityweb .cluster-label { color: #0c447c; }
+.cluster.cl-fusion     { background: rgba(255, 68, 68, 0.07);   border: 1.5px dashed rgba(255, 68, 68, 0.30); }
+.cluster.cl-fusion .cluster-label { color: #8a1414; }
+.cluster.cl-alaska     { background: rgba(133, 79, 11, 0.07);   border: 1.5px dashed rgba(133, 79, 11, 0.30); }
+.cluster.cl-alaska .cluster-label { color: #5c3508; }
+
+/* ===== Nodes ===== */
+.node {
+  position: absolute; z-index: 10;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; cursor: pointer; user-select: none;
+  font-size: 1.3rem; font-weight: 800; line-height: 1.24; letter-spacing: -0.02em;
+  padding: 11px; word-break: break-word; border-radius: 50%;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.18);
+  transition: box-shadow .15s, transform .1s;
+}
+.node:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.25); transform: scale(1.04); z-index: 20; }
+.node span.lbl { pointer-events: none; }
+.node .clickhint { display:block; font-size:10px; opacity:0.55; margin-top:3px; font-weight:400; }
+
+.avatar {
+  width: 40px; height: 40px; border-radius: 50%; margin-bottom: 4px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.55); border: 2px solid rgba(0,0,0,0.15);
+  font-size: 20px; pointer-events: none;
+}
+
+/* node filled with a picture (person, building, whatever), a live
+   map of a place, or a looping video — same treatment, different fill content */
+.node-photo, .node-map, .node-video {
+  position:absolute; inset:0; width:100%; height:100%;
+  border:0; object-fit:cover; border-radius:inherit; z-index:0; pointer-events:none;
+}
+.node.has-photo, .node.has-map, .node.has-video { overflow:hidden; }
+.node.has-photo::after, .node.has-map::after, .node.has-video::after {
+  content:''; position:absolute; inset:0; border-radius:inherit; z-index:1;
+  background:linear-gradient(rgba(0,0,0,.12), rgba(0,0,0,.58)); pointer-events:none;
+}
+.node.has-photo .avatar, .node.has-map .avatar, .node.has-video .avatar { position:relative; z-index:2; }
+.node.has-photo .lbl, .node.has-map .lbl, .node.has-video .lbl { position:relative; z-index:2; color:#fff !important; text-shadow:0 1px 4px rgba(0,0,0,.7); }
+.node.has-photo .clickhint, .node.has-map .clickhint, .node.has-video .clickhint { color:rgba(255,255,255,.85) !important; }
+
+.node.center      { background:hsl(0,0%,16%); border:9px solid hsl(0,0%,62%); color:#ffffff; font-size:19px; }
+.node.branch      { background:hsl(33,38%,93%); border:9px solid hsl(33,45%,36%); color:#2e2008; }
+.node.confirmed   { background:hsl(135,45%,90%); border:9px solid hsl(135,45%,30%); color:#103a06; }
+.node.warning     { background:hsl(42,85%,89%); border:9px solid hsl(42,85%,38%); color:#3a2400; }
+.node.danger      { background:hsl(8,65%,91%); border:9px solid hsl(8,65%,40%); color:#4a0808; }
+.node.bomb        { background:hsl(350,82%,14%); border:9px solid hsl(350,82%,62%); color:#ffd9d9; font-size:1.15rem; }
+.node.entity      { background:hsl(210,62%,91%); border:9px solid hsl(210,62%,38%); color:#062c4d; }
+.node.person      { background:hsl(275,50%,91%); border:9px solid hsl(275,50%,38%); color:#2c0f4d; }
+.node.fbi         { background:hsl(230,62%,15%); border:9px solid hsl(230,62%,60%); color:#d6e4ff; font-size:1.15rem; }
+.node.keyfind     { background:hsl(165,70%,16%); border:10px solid hsl(165,70%,64%); color:#d6f5e8; font-size:1.15rem; }
+.node.dissolved   { background:hsl(0,0%,85%); border:9px dashed hsl(0,0%,38%); color:#2c2c2c; font-size:1.15rem; }
+.node.replacement { background:hsl(22,85%,17%); border:9px solid hsl(22,85%,64%); color:#ffe2c2; font-size:1.15rem; }
+.node.sticky   {
+  border-radius:10px;background:#fffde7;border:4px solid #b8a52a;
+  color:#4a440a;font-size:1.15rem;width:200px;height:auto;
+  min-height:64px;padding:14px 17px;line-height:1.5;cursor:default;
+}
+.node.sticky:hover { transform: none; box-shadow: 0 2px 6px rgba(0,0,0,0.12); }
+
+line.web-line         { stroke:#ccc;stroke-width:1.2px; }
+line.web-line.strong  { stroke:#999;stroke-width:2.2px; }
+line.web-line.confirm { stroke:#3b6d11;stroke-width:1.8px; }
+line.web-line.warn    { stroke:#854f0b;stroke-width:1.2px;stroke-dasharray:5 3; }
+line.web-line.danger  { stroke:#e06060;stroke-width:1.2px;stroke-dasharray:5 3; }
+line.web-line.keyfind{ stroke:#7ab44a;stroke-width:3px; }
+line.web-line.fbi     { stroke:#4488ff;stroke-width:1.8px; }
+line.web-line.bomb    { stroke:#ff4444;stroke-width:1.8px;stroke-dasharray:6 2; }
+line.web-line.replacement { stroke:#ff9933;stroke-width:2px;stroke-dasharray:2 2; }
+line.web-line.ownership { stroke:#0c447c;stroke-width:2px; }
+
+/* ===== Top nav ===== */
+#topNav {
+  position:fixed;top:0;left:0;right:0;z-index:300;
+  display:flex;align-items:center;gap:26px;padding:16px 22px;
+  background:linear-gradient(rgba(10,10,12,0.85), rgba(10,10,12,0));
+}
+#hamburgerBtn {
+  display:none;font-size:1.3rem;line-height:1;background:none;border:none;
+  color:#fff;cursor:pointer;padding:2px 4px;
+}
+#navLinks { display:flex;align-items:center;gap:22px; }
+.navlink {
+  font-size:0.85rem;font-weight:600;color:rgba(255,255,255,.7);text-decoration:none;
+  cursor:pointer;letter-spacing:.02em;padding:3px 1px;border-bottom:2px solid transparent;
+  transition:color .15s,border-color .15s;background:none;
+}
+.navlink:hover{ color:#fff; }
+.navlink.active{ color:#fff;border-bottom-color:#fff; }
+#viewTools { display:flex;align-items:center;gap:4px;margin-left:auto; }
+#viewTools button {
+  font-size:0.9rem;font-weight:700;width:28px;height:28px;border:none;border-radius:8px;
+  background:rgba(255,255,255,0.1);color:#fff;cursor:pointer;
+}
+#viewTools button:hover{ background:rgba(255,255,255,0.22); }
+#zoomLabel{ font-size:0.72rem;color:rgba(255,255,255,0.55);min-width:36px;text-align:center;font-weight:600; }
+#editToggleBtn {
+  font-size:0.8rem;font-weight:700;padding:7px 14px;border:none;border-radius:999px;
+  background:rgba(255,255,255,0.12);color:#fff;cursor:pointer;letter-spacing:.02em;
+}
+#editToggleBtn:hover{ background:rgba(255,255,255,0.24); }
+#editToggleBtn.active{ background:#2a5008; }
+
+#editDrawer {
+  position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:299;
+  display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;
+  max-width:94vw;
+  background:rgba(26,26,30,0.95);backdrop-filter:blur(8px);
+  border-radius:16px;padding:9px;box-shadow:0 10px 28px rgba(0,0,0,0.28);
+}
+#editDrawer[hidden]{ display:none; }
+#editDrawer button {
+  font-size:0.78rem;font-weight:600;padding:9px 15px;border:none;
+  border-radius:10px;background:rgba(255,255,255,0.08);cursor:pointer;
+  color:rgba(255,255,255,0.85);white-space:nowrap;letter-spacing:.01em;
+  transition:background .15s,transform .1s;
+}
+#editDrawer button:hover{ background:rgba(255,255,255,0.18); transform:translateY(-1px); }
+#editDrawer button:active{ transform:translateY(0); }
+#editDrawer button#editModeBtn.active{ background:#2a5008;color:#fff; }
+
+@media (max-width: 680px){
+  #topNav { gap:14px;padding:14px 16px; }
+  #hamburgerBtn { display:block; }
+  #navLinks {
+    display:none;position:fixed;top:52px;left:16px;flex-direction:column;
+    gap:14px;background:rgba(20,20,24,0.97);border-radius:14px;
+    padding:16px 20px;box-shadow:0 10px 28px rgba(0,0,0,0.3);
+  }
+  #navLinks.open { display:flex; }
+  #editToggleBtn span.lbl { display:none; }
+}
+
+#editDrawer button#legendToggleBtn.active{ background:#2a5008;color:#fff; }
+#legend {
+  position:fixed;bottom:14px;left:14px;z-index:300;
+  background:rgba(255,255,255,0.97);border:1px solid #ddd;
+  border-radius:8px;padding:10px 14px;font-size:10px;line-height:1.9;
+  max-height:50vh;overflow-y:auto;
+}
+#legend[hidden]{ display:none; }
+#legend .legendRow{ display:flex;align-items:center;gap:7px; }
+.dot{width:13px;height:13px;border-radius:50%;flex-shrink:0;}
+
+#hint {
+  position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
+  font-size:10.5px;color:#999;pointer-events:none;z-index:300;
+  background:rgba(255,255,255,0.9);padding:5px 14px;border-radius:20px;white-space:nowrap;
+}
+
+/* ===== Edit mode ===== */
+#editModeBtn.active { background:#2a5008;color:#fff;border-color:#2a5008; }
+body.edit-mode #viewport { cursor: default; }
+body.edit-mode .node { cursor: grab; }
+body.edit-mode .node:active { cursor: grabbing; }
+body.edit-mode .node.dragging { opacity: 0.85; box-shadow: 0 8px 24px rgba(0,0,0,0.35); z-index: 50; }
+body.edit-mode .node::after {
+  content: '✎'; position: absolute; top: -6px; right: -6px;
+  width: 22px; height: 22px; border-radius: 50%; background: #2a5008; color: #fff;
+  font-size: 12px; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3); pointer-events: none;
+}
+body.edit-mode .node.sticky::after { top: -8px; right: -8px; }
+
+.resize-handle {
+  display:none; position:absolute; right:-7px; bottom:-7px; width:18px; height:18px;
+  border-radius:50%; background:#2a5008; border:2px solid #fff; cursor:nwse-resize;
+  z-index:6; box-shadow:0 1px 4px rgba(0,0,0,0.4);
+}
+body.edit-mode .node .resize-handle { display:block; }
+body.edit-mode .node .resize-handle:hover { background:#3a7008; }
+
+#editFormOverlay {
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(20,18,14,0.5);z-index:500;display:none;
+  align-items:center;justify-content:center;
+}
+#editForm {
+  width:480px;max-width:92vw;max-height:88vh;background:#fffdf8;
+  border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.35);
+  padding:24px;overflow-y:auto;font-size:13px;color:#2a2a2a;
+}
+#editForm h2 { font-size:16px;margin-bottom:14px;color:#1a1a1a; }
+#editForm label { display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#888;margin:14px 0 5px; }
+#editForm input[type=text], #editForm textarea {
+  width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:7px;
+  font-size:13px;font-family:inherit;resize:vertical;
+}
+#editForm textarea { min-height:60px; }
+#editForm .sectionBlock { border:1.5px solid #e8e3d4;border-radius:8px;padding:12px;margin-bottom:10px;background:#f9f7f0; }
+#editForm .sectionBlock .removeBtn, #editForm .docRow .removeBtn, #editForm .bulletRow .removeBtn {
+  background:#fce8e8;color:#a01818;border:1px solid #e0a0a0;border-radius:5px;
+  font-size:11px;padding:2px 7px;cursor:pointer;float:right;
+}
+#editForm .bulletRow, #editForm .docRow { display:flex;gap:6px;margin-bottom:6px;align-items:flex-start; }
+#editForm .bulletRow textarea, #editForm .docRow input { flex:1; }
+#editForm .addBtn {
+  font-size:11.5px;padding:5px 10px;border:1px dashed #999;border-radius:6px;
+  background:#fff;cursor:pointer;color:#555;margin-top:4px;
+}
+#editForm .addBtn:hover { background:#f0f0f0; }
+#editForm .formButtons { display:flex;gap:10px;margin-top:20px;position:sticky;bottom:0;background:#fffdf8;padding-top:12px; }
+#editForm .saveBtn { flex:1;background:#2a5008;color:#fff;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:600;cursor:pointer; }
+#editForm .cancelBtn { background:#eee;color:#555;border:none;border-radius:8px;padding:11px 18px;font-size:14px;cursor:pointer; }
+#editForm .deleteBtn { background:#fce8e8;color:#a01818;border:1px solid #e0a0a0;border-radius:8px;padding:11px 14px;font-size:13px;cursor:pointer; }
+#editForm .avatarPreview { width:44px;height:44px;border-radius:50%;background:#f0ece4;border:1.5px solid #c0b090;display:flex;align-items:center;justify-content:center;font-size:22px;margin-top:6px; }
+
+/* ===== Color panel ===== */
+#colorPanelOverlay {
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(20,18,14,0.5);z-index:500;display:none;
+  align-items:center;justify-content:center;
+}
+#colorPanel {
+  width:680px;max-width:96vw;max-height:88vh;background:#fffdf8;
+  border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.35);
+  padding:24px;overflow-y:auto;font-size:13px;color:#2a2a2a;position:relative;
+}
+#colorPanel h2 { font-size:16px;margin-bottom:6px;color:#1a1a1a; }
+#colorPanel .colorPanelHint { font-size:11.5px;color:#888;margin-bottom:16px; }
+.colorRow { display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #eee2cc; }
+.colorRow:last-child { border-bottom:none; }
+.colorRow .swatch { width:36px;height:36px;border-radius:50%;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.25); }
+.colorRow .rowLabel { width:104px;flex-shrink:0;font-weight:600;font-size:11.5px; }
+.colorRow .sliderGroup { flex:1;display:flex;flex-direction:column;gap:4px; }
+.colorRow .sliderLine { display:flex;align-items:center;gap:7px; }
+.colorRow .sliderLine label { font-size:10.5px;color:#999;width:32px;flex-shrink:0; }
+.colorRow .sliderLine input[type=range] { flex:1; }
+.colorRow .sliderLine span.val { font-size:10.5px;color:#999;width:28px;text-align:right;flex-shrink:0; }
+#colorPanel .formButtons { display:flex;gap:10px;margin-top:18px;position:sticky;bottom:0;background:#fffdf8;padding-top:12px; }
+.cpTabs { display:flex;gap:6px;margin-bottom:16px;border-bottom:1.5px solid #eee2cc;padding-bottom:12px;flex-wrap:wrap; }
+.cpTab { font-size:11.5px;font-weight:700;padding:7px 13px;border:none;border-radius:999px;background:#f0ece0;color:#776a4a;cursor:pointer; }
+.cpTab.active { background:#2a5008;color:#fff; }
+.cpSection { border:1.5px solid #eee2cc;border-radius:8px;margin-bottom:8px; }
+.cpSection summary { list-style:none;cursor:pointer;padding:9px 12px;display:flex;align-items:center;gap:10px; }
+.cpSection summary::-webkit-details-marker { display:none; }
+.cpSection .cpBody { padding:2px 14px 14px; }
+.cpColorRow { display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap; }
+.cpColorRow label { font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.03em; }
+.cpColorRow input[type=color] { width:40px;height:32px;border:1.5px solid #ddd;border-radius:6px;cursor:pointer;padding:0;background:none; }
+.cpGroupLabel { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#a89968;margin:12px 0 6px; }
+.cpGroupLabel:first-child { margin-top:0; }
+.sliderNum { width:52px;flex-shrink:0;padding:3px 5px;border:1.5px solid #ddd;border-radius:5px;font-size:11px;text-align:right; }
+.cpNodeSelectRow { display:flex;gap:8px;align-items:center;margin-bottom:14px; }
+.cpNodeSelectRow select { flex:1;padding:8px 10px;border:1.5px solid #ddd;border-radius:7px;font-size:12.5px; }
+
+/* ===== Detail panel ===== */
+#overlay {
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(20,18,14,0.45);z-index:400;display:none;
+  align-items:center;justify-content:flex-end;
+}
+#detailPanel {
+  width:440px;max-width:92vw;height:100%;background:#fffdf8;
+  box-shadow:-6px 0 24px rgba(0,0,0,0.25);
+  padding:28px 26px;overflow-y:auto;
+  font-size:13.5px;color:#2a2a2a;line-height:1.6;
+}
+#detailPanel .headerRow { display:flex; align-items:center; gap:14px; margin-bottom:6px; }
+#detailPanel .avatarBig {
+  width:54px;height:54px;border-radius:50%;flex-shrink:0;
+  background:#f0ece4;border:2px solid #c0b090;
+  display:flex;align-items:center;justify-content:center;font-size:26px;
+}
+#detailPanel h2 { font-size:1.4rem;color:#1a1a1a;line-height:1.3; }
+#detailPanel .subtitle{ font-size:0.8rem;color:#888;margin-bottom:16px;text-transform:uppercase;letter-spacing:.04em;}
+#detailPanel .tag {
+  display:inline-block;font-size:10px;font-weight:700;padding:3px 9px;border-radius:12px;
+  margin-bottom:16px;text-transform:uppercase;letter-spacing:.03em;
+}
+#detailPanel .tag.bomb{background:#2a0505;color:#ff9999;}
+#detailPanel .tag.confirmed{background:#eaf3de;color:#3b6d11;}
+#detailPanel .tag.warning{background:#faeeda;color:#854f0b;}
+#detailPanel .tag.danger{background:#fce8e8;color:#a01818;}
+#detailPanel .tag.entity{background:#e6f3fb;color:#1a5a8a;}
+#detailPanel .tag.person{background:#f3e6fb;color:#5a2a8a;}
+#detailPanel .tag.fbi{background:#0a1a3a;color:#a8c8ff;}
+#detailPanel .tag.keyfind{background:#1a3a1a;color:#9ad97a;}
+#detailPanel .tag.dissolved{background:#e0e0e0;color:#555;}
+#detailPanel .tag.replacement{background:#3a1a00;color:#ffb366;}
+#detailPanel .tag.branch{background:#f0ece4;color:#6a5530;}
+#detailPanel section { margin-bottom:18px; }
+#detailPanel section h3 { font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:#999;margin-bottom:6px; }
+#detailPanel ul { padding-left:18px; margin-top:4px;}
+#detailPanel li { margin-bottom:5px; }
+#detailPanel .closeBtn {
+  position:absolute;top:20px;right:20px;background:none;border:none;
+  font-size:22px;color:#999;cursor:pointer;line-height:1;
+}
+#detailPanel .closeBtn:hover{color:#333;}
+#detailPanel .connections span {
+  display:inline-block;background:#f0ece4;border-radius:10px;padding:3px 10px;
+  font-size:11px;margin:0 4px 4px 0;color:#5a4a30;cursor:pointer;
+}
+/* Documents/links section */
+.docItem {
+  display:flex; align-items:center; gap:8px;
+  padding:8px 10px; margin-bottom:6px; border-radius:8px;
+  background:#f7f5ee; border:1px solid #e8e3d4; font-size:12.5px;
+}
+.docItem .docIcon { font-size:14px; opacity:.6; flex-shrink:0; }
+.docItem .docLabel { flex:1; color:#444; }
+.docItem.placeholder { border-style:dashed; color:#aaa; font-style:italic; }
+.docItem a { color:#1a5a8a; text-decoration:none; }
+.docItem a:hover { text-decoration:underline; }
+.addDocHint {
+  font-size:11px; color:#aaa; font-style:italic; padding:6px 2px;
+}
+
+/* ===== Page sections ===== */
+.pageSection {
+  min-height:70vh;padding:64px 4vw 44px;
+  border-top:2px dashed rgba(0,0,0,0.12);background:var(--board-bg);
+}
+.sectionHead h2 { font-size:1.7rem;color:var(--header-text-color, #1a1a1a);font-weight:800; }
+.sectionSub { font-size:0.85rem;color:var(--section-sub-color, #999);margin:4px 0 18px; }
+.newsMap { height:62vh;border-radius:14px;border:1px solid #ddd;background:#e8e4d8; }
+.newsMap iframe { width:100%;height:100%;border:0;border-radius:inherit; }
+#mapPicker { display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px; }
+.mapChip {
+  font-size:0.8rem;font-weight:600;padding:7px 14px;border-radius:999px;cursor:pointer;
+  border:1px solid #d8d2c0;background:#fff;color:#444;
+}
+.mapChip:hover { border-color:#b8a52a; }
+.mapChip.active { background:#2a2a2e;color:#fff;border-color:#2a2a2e; }
+.storyStrip { display:flex;gap:12px;overflow-x:auto;padding:14px 2px 6px; }
+.storyCard {
+  min-width:250px;max-width:250px;flex:none;background:#fff;
+  border:1px solid #e8e3d4;border-radius:10px;padding:10px 12px;
+  font-size:0.85rem;cursor:pointer;
+}
+.storyCard:hover { border-color:#b8a52a; }
+.storyCard .sc-t { font-weight:600;line-height:1.35; }
+.storyCard .sc-m { font-size:10px;color:#999;margin-top:6px;display:flex;gap:7px;flex-wrap:wrap; }
+.regionChip { background:#f0ece4;border-radius:8px;padding:1px 7px;color:#6a5530; }
+.newsNode {
+  width:20px;height:20px;border-radius:50%;
+  background:hsl(8,65%,91%);border:5px solid hsl(8,65%,40%);
+  box-shadow:0 2px 6px rgba(0,0,0,0.35);
+}
+.newsNode.onion {
+  border-radius:5px;background:#fdf7d8;border:5px solid #7a8a1a;
+}
+#storyLight {
+  position:fixed;z-index:650;display:none;width:340px;max-width:92vw;
+  background:#fffdf8;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.4);
+  overflow:hidden;font-size:12.5px;color:#2a2a2a;
+}
+#storyLight img { width:100%;max-height:180px;object-fit:cover;display:block; }
+#storyLight .sl-body { padding:12px 14px; }
+#storyLight .sl-t { font-weight:700;font-size:13.5px;line-height:1.35; }
+#storyLight .sl-t a { color:#1a1a1a;text-decoration:none; }
+#storyLight .sl-t a:hover { text-decoration:underline; }
+#storyLight .sl-m { font-size:10px;color:#999;margin:6px 0;display:flex;gap:8px;flex-wrap:wrap; }
+#storyLight .sl-s { font-size:11.5px;color:#555;line-height:1.5; }
+#storyLight .sl-x {
+  position:absolute;top:6px;right:8px;border:none;background:rgba(255,255,255,0.85);
+  border-radius:50%;width:22px;height:22px;font-size:13px;cursor:pointer;color:#555;
+}
+#filmsControls { display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px; }
+#filmsGrid { display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px; }
+.leaflet-container { font-family:inherit; }
+</style>
+</head>
+<body>
+
+<nav id="topNav">
+  <button id="hamburgerBtn" aria-label="Menu">☰</button>
+  <div id="navLinks">
+    <a class="navlink" data-go="viewport">The Wall</a>
+    <a class="navlink" data-go="mapSection">Map</a>
+  </div>
+  <div id="viewTools">
+    <button onclick="zoomBy(0.83)" title="Zoom out" aria-label="Zoom out">−</button>
+    <span id="zoomLabel">100%</span>
+    <button onclick="zoomBy(1.2)" title="Zoom in" aria-label="Zoom in">+</button>
+    <button onclick="fitAll()" title="Fit all">⤢</button>
+  </div>
+  <button id="editToggleBtn">✏️ Edit</button>
+</nav>
+
+<div id="editDrawer" hidden>
+  <button id="legendToggleBtn">🔑 Key</button>
+  <button id="editModeBtn" onclick="toggleEditMode()">✏️ Edit mode: OFF</button>
+  <button id="colorPanelBtn" onclick="openColorPanel()">🎨 Style</button>
+  <button id="resetDataBtn" onclick="resetAllEdits()" style="color:#ff8a8a;">Reset all edits</button>
+</div>
+
+<div id="viewport">
+  <div id="world">
+    <!-- zone backgrounds injected by JS -->
+    <svg id="lines"></svg>
+    <!-- nodes injected by JS -->
+  </div>
+</div>
+
+<div class="pageSection" id="mapSection">
+  <div class="sectionHead"><h2>🗺️ Map &amp; Locations</h2></div>
+  <div class="sectionSub">Click a 📍 on any location (in the wall's detail panel, or the chips below) to view it here. Click anywhere on the embedded map to drop a pin there and open that exact spot in Google Maps / Street View.</div>
+  <div id="mapPicker"></div>
+  <div id="mapFrame" class="newsMap"></div>
+</div>
+
+
+<!-- The video and news sections are switched off in this demo build; their
+     scripts share a block with the map and still address these containers,
+     so they stay as empty hidden stubs rather than null references. -->
+<div hidden>
+  <div id="filmsControls"></div><div id="filmsGrid"></div>
+  <div id="watchMap"></div><div id="watchStrip"></div>
+  <div id="onionMap"></div><div id="onionStrip"></div>
+</div>
+
+<div id="storyLight"></div>
+
+<div id="legend" hidden>
+  <div id="legendItems"></div>
+  <div style="margin-top:8px;font-style:italic;opacity:.7;">Click any circle for full details</div>
+  <div style="margin-top:4px;font-style:italic;opacity:.6;">Dashed regions = zones &amp; sub-clusters</div>
+  <div style="margin-top:4px;font-style:italic;opacity:.6;">Bigger circle = higher importance</div>
+</div>
+
+<div id="hint">Drag or scroll to pan · Pinch/Ctrl+scroll to zoom · Click a node for details</div>
+
+<div id="overlay" onclick="if(event.target===this)closeDetail()">
+  <div id="detailPanel">
+    <button class="closeBtn" onclick="closeDetail()">&times;</button>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<div id="editFormOverlay" onclick="if(event.target===this)closeEditForm()">
+  <div id="editForm">
+    <div id="editFormContent"></div>
+  </div>
+</div>
+
+<div id="colorPanelOverlay" onclick="if(event.target===this)closeColorPanel()">
+  <div id="colorPanel">
+    <button class="closeBtn" onclick="closeColorPanel()">&times;</button>
+    <div id="colorPanelContent"></div>
+  </div>
+</div>
+
+<script>
+/* server sync — seed localStorage from the server-injected state BEFORE the
+   engine below reads it. The server replaces the marker on every request. */
+/*__SERVER_STATE__*/
+try{
+  if(window.SERVER_STATE){
+    const S = window.SERVER_STATE;
+    if(S.overrides) localStorage.setItem('wall_demo_v1', JSON.stringify(S.overrides));
+    if(S.colors) localStorage.setItem('wall_demo_colors_v1', JSON.stringify(S.colors));
+    else if(S.colors === null) localStorage.removeItem('wall_demo_colors_v1');
+  }
+}catch(e){ console.warn('server state seed failed', e); }
+</script>
+<script>
+const ZONES = [
+  { id:'voyage', label:'The Voyage — New York to Genoa', sublabel:'Cleared Staten Island 7 Nov 1872 · 1,701 barrels of denatured alcohol · ten aboard',
+    x:77, y:77, w:2000, h:1900, cls:'corporate' },
+  { id:'discovery', label:'The Discovery — 4 December 1872', sublabel:'Dei Gratia sights her under sail and unmanned · Gibraltar salvage hearing',
+    x:2650, y:77, w:2000, h:1900, cls:'legallymine' },
+];
+
+const CLUSTERS = [
+  { id:'c-aboard',   zone:'voyage',    label:'Aboard at departure — ten souls', x:160, y:180, w:1830, h:470, cls:'cl-officers' },
+  { id:'c-cargo',    zone:'voyage',    label:'The cargo and the ship', x:160, y:790, w:1180, h:900, cls:'cl-fdd' },
+  { id:'c-found',    zone:'discovery', label:'What was found aboard', x:2730, y:180, w:1840, h:470, cls:'cl-delaware' },
+  { id:'c-theories', zone:'discovery', label:'Theories, then and since', x:2730, y:1070, w:1840, h:570, cls:'cl-storeweb' },
+];
+
+const NODES = [
+
+{
+  id:'celeste', x:2360, y:850, type:'center', tier:1, label:'Mary\nCeleste', avatar:'\u2693',
+  detail:{ title:'Mary Celeste', subtitle:'Brigantine, 282 tons · found abandoned 4 December 1872', tag:'entity',
+    sections:[
+      { h:'The short version', items:[
+        'Left New York for Genoa on 7 November 1872 with ten people aboard: Captain Benjamin Briggs, his wife Sarah, their two-year-old daughter Sophia, and a crew of seven.',
+        'Sighted on 4 December 1872 about 400 miles east of the Azores, under partial sail, on a starboard tack, with nobody aboard.',
+        'She was seaworthy. The cargo was largely intact. There was food and water. The single lifeboat was gone.',
+        'Not one of the ten was ever seen again, and no explanation has ever been established.',
+      ]},
+      { h:'Why she is the standing example', items:[
+        'The Gibraltar salvage hearing produced a large documentary record and no finding of cause, which is why the case is still argued from primary sources rather than settled.',
+        'Almost every popular detail — a hot meal on the table, a still-warm stove, a cat asleep on a locker — comes from a short story Arthur Conan Doyle published in 1884, not from the record.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'briggs', x:600, y:390, type:'person', tier:2, label:'Capt. Benjamin\nBriggs',
+  detail:{ title:'Captain Benjamin Spooner Briggs', subtitle:'Master · part-owner · 37 years old', tag:'person',
+    sections:[
+      { h:'Role', items:[
+        'An experienced and, by every account gathered at the hearing, notably careful master — a temperance man who held a share in the vessel himself.',
+        'His personal stake is the standard argument against the mutiny and barratry theories: he had money and family aboard and nothing to gain.',
+        'Brought his wife and younger child on the voyage; their elder son Arthur was left at school in Massachusetts and so survived.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'sarah', x:1180, y:390, type:'person', tier:2, label:'Sarah Briggs\n& Sophia, 2',
+  detail:{ title:'Sarah Elizabeth Briggs and Sophia Matilda', subtitle:'The captain\u2019s wife and their younger child', tag:'person',
+    sections:[
+      { h:'Role', items:[
+        'Sarah\u2019s letters home from New York, written days before sailing, are among the last direct accounts of the ship and her company.',
+        'A melodeon was aboard for her. It was still aboard when the ship was found.',
+        'The presence of a toddler is the usual objection to any theory requiring a calm, orderly, voluntary departure in a small boat.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'crew', x:1760, y:390, type:'entity', tier:2, label:'Crew of seven',
+  detail:{ title:'The crew', subtitle:'Two mates, a cook, four seamen', tag:'entity',
+    sections:[
+      { h:'Role', items:[
+        'Albert Richardson (first mate), Andrew Gilling (second mate), Edward Head (steward and cook), and four German seamen — the brothers Volkert and Boz Lorenzen, Arian Martens and Gottlieb Goodschaad.',
+        'Briggs had written that he considered them a capable company. No disciplinary record or grievance was produced at the hearing.',
+        'The four German seamen\u2019s nationality was leaned on heavily by the prosecuting advocate at Gibraltar, on no evidence, and is a fair illustration of how the hearing ran.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'cargo', x:420, y:980, type:'confirmed', tier:2, label:'1,701 barrels\nof alcohol',
+  detail:{ title:'The cargo', subtitle:'Denatured industrial alcohol, consigned to Genoa', tag:'confirmed',
+    sections:[
+      { h:'What it was', items:[
+        'Crude industrial alcohol in red oak barrels, shipped for a Genoese firm and insured at roughly $36,000 — far more than the vessel.',
+        'The cargo was found essentially undisturbed, which is the central fact against piracy: a pirate who boards and takes nothing is not a pirate.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'barrels', x:1000, y:980, type:'keyfind', tier:2, label:'Nine barrels\nfound empty',
+  detail:{ title:'Nine empty barrels', subtitle:'Discovered on unloading at Genoa', tag:'keyfind',
+    sections:[
+      { h:'Why it matters', items:[
+        'When the cargo was finally discharged at Genoa, nine of the 1,701 barrels were empty.',
+        'Red oak is more porous than white oak, so leakage is unremarkable in itself — but leaking alcohol in a closed hold produces vapour.',
+        'This is the evidential root of the strongest surviving theory: a vapour build-up, a frightening noise or a visible flash, and a precautionary evacuation that went wrong.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'amazon', x:420, y:1420, type:'dissolved', tier:3, label:'Was the\nAmazon',
+  detail:{ title:'Amazon', subtitle:'Her first name and first decade', tag:'dissolved',
+    sections:[
+      { h:'Before', items:[
+        'Launched at Spencer\u2019s Island, Nova Scotia in 1861 as Amazon. Her first master died days into her first voyage.',
+        'Driven ashore in a storm in 1867, sold as a wreck, rebuilt, re-registered under American ownership and renamed Mary Celeste.',
+        'The run of misfortune before 1872 is why she was later written about as a cursed ship — a reading that postdates the events and explains nothing.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'deigratia', x:3000, y:390, type:'entity', tier:2, label:'Dei Gratia',
+  detail:{ title:'Dei Gratia', subtitle:'The brigantine that found her', tag:'entity', mapEmbed:'Gibraltar',
+    sections:[
+      { h:'Role', items:[
+        'Sighted the Mary Celeste yawing oddly under partial sail and closed with her after signalling and getting no answer.',
+        'Her master, David Morehouse, had dined with Briggs in New York shortly before both ships sailed — a coincidence the Gibraltar court treated with open suspicion.',
+        'Put three men aboard, who found her abandoned, and brought her into Gibraltar to claim salvage.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'morehouse', x:3580, y:390, type:'person', tier:2, label:'Capt. David\nMorehouse',
+  detail:{ title:'Captain David Reed Morehouse', subtitle:'Master of the Dei Gratia · salvage claimant', tag:'person',
+    sections:[
+      { h:'Role', items:[
+        'Brought the derelict in and claimed salvage, which put him immediately under suspicion of collusion with Briggs.',
+        'The court found nothing, but awarded only about a fifth of the insured value — unusually low, and generally read as a signal of lingering doubt rather than a finding of fact.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'logslate', x:4160, y:390, type:'branch', tier:2, label:'The log slate\n— 25 Nov',
+  detail:{ title:'The log slate', subtitle:'Last entry 8 a.m., 25 November 1872', tag:'branch',
+    sections:[
+      { h:'What it recorded', items:[
+        'The final entry put the ship just off Santa Maria Island in the Azores — around six miles from land and nine days before she was found.',
+        'In those nine days she sailed on, unmanned, roughly 400 miles further east.',
+        'The entry is entirely routine. Nothing in it anticipates anything.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'yawl', x:3000, y:1270, type:'keyfind', tier:2, label:'The yawl\nis missing',
+  detail:{ title:'The missing yawl', subtitle:'The single lifeboat, launched — not torn away', tag:'keyfind',
+    sections:[
+      { h:'Why it matters', items:[
+        'The ship\u2019s one small boat was gone from above the main hatch, and the evidence read as a deliberate launch rather than a loss over the side.',
+        'A length of rope was found trailing from the ship, frayed at the end — the origin of the idea that the boat was tied astern and then parted.',
+        'Everything about the abandonment looks orderly and voluntary. That is the hardest fact in the case, because an orderly evacuation implies a reason, and no reason was ever found.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'nostruggle', x:3580, y:1270, type:'bomb', tier:2, label:'No sign of\nstruggle',
+  detail:{ title:'No sign of violence or struggle', subtitle:'The finding that closes off most of the obvious answers', tag:'bomb',
+    sections:[
+      { h:'What the boarding party found', items:[
+        'The crew\u2019s personal effects, including seamen\u2019s chests, oilskins and pipes, were still aboard and undisturbed. Men fleeing violence do not pack, and men taken by force do not leave an orderly ship.',
+        'About three and a half feet of water in the hold — significant, but well within what her pumps could handle and not enough to sink her.',
+        'The ship\u2019s papers were gone, but the log slate was not, which fits a captain leaving in a hurry with what mattered.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'sword', x:4160, y:1270, type:'warning', tier:3, label:'The\nsword',
+  detail:{ title:'The sword under the captain\u2019s berth', subtitle:'The hearing\u2019s one piece of apparent physical evidence', tag:'warning',
+    sections:[
+      { h:'What it actually was', items:[
+        'An ornamental sword was found and the discolouration on it presented at Gibraltar as blood, in support of a mutiny theory.',
+        'Analysis found no blood. The marks were rust.',
+        'Worth keeping on the board as the example it is: the single most quoted detail of the case was wrong, and was corrected within the same proceeding that produced it.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'fate', x:3580, y:1700, type:'danger', tier:1, label:'What happened\nto the ten?',
+  detail:{ title:'Open question', subtitle:'Unresolved since 1872', tag:'danger',
+    sections:[
+      { h:'The theories that survive contact with the record', items:[
+        'Alcohol vapour: a leak from the nine barrels, a bang or a flash, and a precautionary evacuation to a boat tied astern that then parted in weather. Fits the empty barrels, the launched yawl, the trailing rope and the absence of fire damage.',
+        'Pumping and misjudgement: a sounding rod or a blocked pump leads Briggs to believe she is filling faster than she is, and he abandons a ship that was never going to sink.',
+        'Waterspout or sudden squall: accounts for water in the hold and disordered rigging, but not for an orderly departure with the papers.',
+      ]},
+      { h:'The theories that do not', items:[
+        'Mutiny — no violence, nothing taken, and the sword stain was rust.',
+        'Piracy — a cargo worth $36,000 left aboard.',
+        'Insurance fraud by collusion — investigated at length at Gibraltar and unsupported; Briggs\u2019s own stake and family aboard argue against it.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'after', x:4160, y:1700, type:'replacement', tier:3, label:'Her last\nvoyage, 1885',
+  detail:{ title:'Afterwards', subtitle:'Twelve more years, then deliberately wrecked', tag:'replacement',
+    sections:[
+      { h:'The end', items:[
+        'She sailed on under a succession of owners, unprofitably, with the story attached to her.',
+        'In 1885 her last master ran her deliberately onto the Rochelois Bank off Haiti in an attempted insurance fraud. She would not sink quickly; the scheme was exposed.',
+        'The wreck closed the ship\u2019s history. The question of December 1872 stayed open.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'note-demo', x:2360, y:1700, type:'sticky', tier:3, label:'Demo board.\nDrag me.',
+  detail:{ title:'This is a demonstration board', subtitle:'Public-domain subject, no real case material', tag:'sticky',
+    sections:[
+      { h:'Try it', items:[
+        'Drag any circle to move it. Drag the handle at its corner to resize, and double-click that handle to reset.',
+        'Click a circle to read its detail panel.',
+        'Hit the Edit button in the top bar, then the Key and Style buttons, to recolour and restyle every node type live.',
+        'Your changes save in your own browser only. Nothing here reaches a server, and nothing you do affects anyone else\u2019s view.',
+      ]},
+    ], docs:[] },
+},
+
+{
+  id:'note-scroll', x:600, y:1700, type:'sticky', tier:3, label:'Scroll down\nfor the map',
+  detail:{ title:'The map section', subtitle:'Below the board', tag:'sticky',
+    sections:[
+      { h:'What is down there', items:[
+        'Leaflet and OpenStreetMap, with no API key anywhere. Pick a location to fly to it, or click anywhere on the map to drop a pin.',
+        'The Dei Gratia circle on the board is filled with a live map rather than a photograph — the same mechanism, scaled into a node.',
+      ]},
+    ], docs:[] },
+},
+
+];
+
+const EDGES = [
+  ['celeste','briggs','strong'],
+  ['celeste','deigratia','strong'],
+  ['celeste','fate','strong'],
+  ['briggs','sarah','strong'],
+  ['briggs','crew','normal'],
+  ['briggs','yawl','normal'],
+  ['celeste','cargo','normal'],
+  ['cargo','barrels','bomb'],
+  ['barrels','fate','bomb'],
+  ['amazon','celeste','normal'],
+  ['deigratia','morehouse','strong'],
+  ['deigratia','logslate','normal'],
+  ['morehouse','sword','normal'],
+  ['logslate','fate','normal'],
+  ['yawl','nostruggle','strong'],
+  ['yawl','fate','bomb'],
+  ['nostruggle','fate','strong'],
+  ['sword','nostruggle','normal'],
+  ['celeste','after','normal'],
+  ['fate','after','normal'],
+];
+
+</script>
+<script>
+/* server sync — nodes added on this wall (RSS imports, + Node) live in
+   overrides.__added and are appended into NODES before the engine renders;
+   nodes deleted on the wall are listed in overrides.__removed and filtered
+   out of NODES and EDGES here */
+try{
+  const raw = localStorage.getItem('wall_demo_v1');
+  const o = raw ? JSON.parse(raw) : {};
+  for(const n of (o.__added || [])){
+    if(n && n.id && !NODES.some(x => x.id === n.id)) NODES.push(n);
+  }
+  const removed = new Set(o.__removed || []);
+  if(removed.size){
+    for(let i = NODES.length-1; i >= 0; i--) if(removed.has(NODES[i].id)) NODES.splice(i, 1);
+    for(let i = EDGES.length-1; i >= 0; i--) if(removed.has(EDGES[i][0]) || removed.has(EDGES[i][1])) EDGES.splice(i, 1);
+  }
+  // zone background label/sublabel edits, keyed by zone id
+  Object.entries(o.__zones || {}).forEach(([id, patch]) => {
+    const z = ZONES.find(x => x.id === id);
+    if(z) Object.assign(z, patch);
+  });
+}catch(e){ console.warn('added/removed node load failed', e); }
+</script>
+<script>
+// ============================================================
+// INVESTIGATION WALL — APP ENGINE
+// zones + clusters + tiers + avatars + docs + EDIT MODE
+// ============================================================
+
+const STORAGE_KEY = 'wall_demo_v1';
+
+const viewport = document.getElementById('viewport');
+const world = document.getElementById('world');
+const svg = document.getElementById('lines');
+
+let scale = 0.62;
+let originX = -60, originY = -40;
+let panning = false, panStartX=0, panStartY=0, originStartX=0, originStartY=0;
+let editMode = false;
+
+// ============================================================
+// PERSISTENCE (localStorage) — merges saved overrides into NODES
+// ============================================================
+function loadOverrides(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return {};
+    return JSON.parse(raw);
+  }catch(e){ console.warn('Could not load saved edits', e); return {}; }
+}
+function saveOverrides(overrides){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
+  }catch(e){ console.warn('Could not save edits', e); }
+}
+let overrides = loadOverrides(); // { nodeId: { x, y, label, avatar, detail:{...} } }
+
+function applyOverridesToNodes(){
+  NODES.forEach(n=>{
+    const o = overrides[n.id];
+    if(!o) return;
+    if(typeof o.x === 'number') n.x = o.x;
+    if(typeof o.y === 'number') n.y = o.y;
+    if(typeof o.label === 'string') n.label = o.label;
+    if(typeof o.avatar === 'string') n.avatar = o.avatar;
+    if(typeof o.photo === 'string') n.photo = o.photo;
+    if(typeof o.mapEmbed === 'string') n.mapEmbed = o.mapEmbed;
+    if(typeof o.videoEmbed === 'string') n.videoEmbed = o.videoEmbed;
+    if(typeof o.sizeOverride === 'number') n.sizeOverride = o.sizeOverride;
+    if(typeof o.textColor === 'string') n.textColor = o.textColor;
+    if(typeof o.fontSize === 'string') n.fontSize = o.fontSize;
+    if(typeof o.lineHeight === 'string') n.lineHeight = o.lineHeight;
+    if(typeof o.fontWeight === 'string') n.fontWeight = o.fontWeight;
+    if(o.detail) n.detail = JSON.parse(JSON.stringify(o.detail)); // deep copy
+  });
+}
+
+function persistNode(n){
+  if(!overrides[n.id]) overrides[n.id] = {};
+  overrides[n.id].x = n.x;
+  overrides[n.id].y = n.y;
+  overrides[n.id].label = n.label;
+  if(n.avatar) overrides[n.id].avatar = n.avatar;
+  if(n.photo) overrides[n.id].photo = n.photo; else delete overrides[n.id].photo;
+  if(n.mapEmbed) overrides[n.id].mapEmbed = n.mapEmbed; else delete overrides[n.id].mapEmbed;
+  if(n.videoEmbed) overrides[n.id].videoEmbed = n.videoEmbed; else delete overrides[n.id].videoEmbed;
+  if(n.sizeOverride) overrides[n.id].sizeOverride = n.sizeOverride; else delete overrides[n.id].sizeOverride;
+  if(n.textColor) overrides[n.id].textColor = n.textColor; else delete overrides[n.id].textColor;
+  if(n.fontSize) overrides[n.id].fontSize = n.fontSize; else delete overrides[n.id].fontSize;
+  if(n.lineHeight) overrides[n.id].lineHeight = n.lineHeight; else delete overrides[n.id].lineHeight;
+  if(n.fontWeight) overrides[n.id].fontWeight = n.fontWeight; else delete overrides[n.id].fontWeight;
+  if(n.detail) overrides[n.id].detail = JSON.parse(JSON.stringify(n.detail));
+  saveOverrides(overrides);
+}
+
+function resetAllEdits(){
+  if(!confirm('This will erase every edit you have made in this browser (positions, text, docs, photos) and restore the original wall. This cannot be undone. Continue?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
+}
+
+// ============================================================
+// PER-TYPE COLOR SYSTEM (editable via the Colors panel)
+// ============================================================
+const COLOR_STORAGE_KEY = 'wall_demo_colors_v1';
+
+const TYPE_LABELS = {
+  center:'Center', bomb:'Bombshell', keyfind:'Key finding',
+  entity:'Entity', person:'Person', fbi:'FBI-connected', confirmed:'Confirmed',
+  warning:'Warning', danger:'Open question', dissolved:'Dissolved',
+  replacement:'Replacement entity', branch:'Document / topic',
+  sticky:'Sticky note', film:'Video'
+};
+
+// Each type stores fill (h,s,l) and border (h,s,l) independently so you can
+// push the border far from the fill for contrast, or match them, your choice.
+const DEFAULT_COLORS = {
+  center:      { fillH:0,   fillS:0,  fillL:16, borderH:0,   borderS:0,  borderL:62, textColor:'#ffffff', sizeScale:1.0 },
+  bomb:        { fillH:350, fillS:82, fillL:14, borderH:350, borderS:82, borderL:62, textColor:'#ffd9d9', sizeScale:1.0 },
+  keyfind:     { fillH:165, fillS:70, fillL:16, borderH:165, borderS:70, borderL:64, textColor:'#d6f5e8', sizeScale:1.0 },
+  fbi:         { fillH:230, fillS:62, fillL:15, borderH:230, borderS:62, borderL:60, textColor:'#d6e4ff', sizeScale:1.0 },
+  replacement: { fillH:22,  fillS:85, fillL:17, borderH:22,  borderS:85, borderL:64, textColor:'#ffe2c2', sizeScale:1.0 },
+  entity:      { fillH:210, fillS:62, fillL:91, borderH:210, borderS:62, borderL:38, textColor:'#062c4d', sizeScale:1.0 },
+  person:      { fillH:275, fillS:50, fillL:91, borderH:275, borderS:50, borderL:38, textColor:'#2c0f4d', sizeScale:1.0 },
+  confirmed:   { fillH:135, fillS:45, fillL:90, borderH:135, borderS:45, borderL:30, textColor:'#103a06', sizeScale:1.0 },
+  warning:     { fillH:42,  fillS:85, fillL:89, borderH:42,  borderS:85, borderL:38, textColor:'#3a2400', sizeScale:1.0 },
+  danger:      { fillH:8,   fillS:65, fillL:91, borderH:8,   borderS:65, borderL:40, textColor:'#4a0808', sizeScale:1.0 },
+  branch:      { fillH:33,  fillS:38, fillL:93, borderH:33,  borderS:45, borderL:36, textColor:'#2e2008', sizeScale:1.0 },
+  dissolved:   { fillH:0,   fillS:0,  fillL:85, borderH:0,   borderS:0,  borderL:38, textColor:'#2c2c2c', sizeScale:1.0 },
+  sticky:      { fillH:55,  fillS:100,fillL:95, borderH:52,  borderS:63, borderL:44, textColor:'#4a440a', sizeScale:1.0 },
+  film:        { fillH:220, fillS:18, fillL:14, borderH:45,  borderS:85, borderL:55, textColor:'#ffe9b8', sizeScale:1.0 },
+};
+// board background — not a node type, but reuses the same slider machinery;
+// starting values match the original hardcoded #f3f1ec cream so nothing
+// changes until the sliders are touched
+const PAGE_BG_KEY = '__page';
+DEFAULT_COLORS[PAGE_BG_KEY] = { fillH:43, fillS:22, fillL:94, fillA:100, borderH:35, borderS:15, borderL:75, headerText:'#1a1a1a', subText:'#999999' };
+// font controls — Google Sans Flex is variable from 400 to 1000, and lineH
+// is line-height ×100 (124 = the original 1.24). borderW is the ring width
+// in px (matches each type's old hardcoded width). fontSize starting values
+// match each type's original hardcoded CSS font-size (19px for center,
+// 20px [1.15rem @ 17px root] for the smaller-text types, 22px [1.3rem] base
+// for everything else) so turning the dynamic override on doesn't visually
+// change anything until the slider is actually touched.
+const SMALLER_TEXT_TYPES = ['bomb', 'fbi', 'keyfind', 'dissolved', 'replacement'];
+Object.entries(DEFAULT_COLORS).forEach(([t, c]) => {
+  c.weight = 800; c.lineH = 124;
+  c.borderW = t === 'sticky' ? 4 : t === 'keyfind' ? 10 : 9;
+  c.fontSize = t === 'center' ? 19 : SMALLER_TEXT_TYPES.includes(t) ? 20 : 22;
+});
+DEFAULT_COLORS.sticky.lineH = 150;  // sticky notes were always airier
+DEFAULT_COLORS.sticky.radius = 10;  // corner rounding, sticky only
+
+function loadColors(){
+  try{
+    const raw = localStorage.getItem(COLOR_STORAGE_KEY);
+    if(!raw) return JSON.parse(JSON.stringify(DEFAULT_COLORS));
+    const saved = JSON.parse(raw);
+    const merged = JSON.parse(JSON.stringify(DEFAULT_COLORS));
+    Object.keys(saved).forEach(k=>{ if(merged[k]) Object.assign(merged[k], saved[k]); });
+    return merged;
+  }catch(e){ return JSON.parse(JSON.stringify(DEFAULT_COLORS)); }
+}
+function saveColors(colors){
+  try{ localStorage.setItem(COLOR_STORAGE_KEY, JSON.stringify(colors)); }
+  catch(e){ console.warn('Could not save colors', e); }
+}
+let currentColors = loadColors();
+
+function applyColorStyles(){
+  let css = '';
+  Object.keys(currentColors).forEach(type=>{
+    const c = currentColors[type];
+    if(type === PAGE_BG_KEY){
+      const a = (c.fillA==null?100:c.fillA)/100;
+      const dotL = c.fillL > 50 ? Math.max(0,c.fillL-8) : Math.min(100,c.fillL+8);
+      const root = document.documentElement.style;
+      root.setProperty('--board-bg', `hsla(${c.fillH},${c.fillS}%,${c.fillL}%,${a})`);
+      root.setProperty('--board-dot', `hsla(${c.fillH},${Math.round(c.fillS*0.7)}%,${dotL}%,0.6)`);
+      root.setProperty('--header-text-color', c.headerText || '#1a1a1a');
+      root.setProperty('--section-sub-color', c.subText || '#999999');
+      return;
+    }
+    css += `.node.${type} { background:hsl(${c.fillH},${c.fillS}%,${c.fillL}%) !important; `+
+           `border-color:hsl(${c.borderH},${c.borderS}%,${c.borderL}%) !important; `+
+           `color:${c.textColor} !important; `+
+           `font-size:${c.fontSize || 22}px !important; `+
+           `font-weight:${c.weight || 800} !important; `+
+           `line-height:${(c.lineH || 124)/100} !important; `+
+           `border-width:${c.borderW ?? (type==='sticky' ? 4 : 9)}px !important; `+
+           (type === 'sticky' ? `border-radius:${c.radius ?? 10}px !important; ` : '')+
+           `}\n`;
+  });
+  let styleEl = document.getElementById('dynamicColorStyles');
+  if(!styleEl){
+    styleEl = document.createElement('style');
+    styleEl.id = 'dynamicColorStyles';
+    document.head.appendChild(styleEl);
+  }
+  styleEl.textContent = css;
+  renderLegend();
+}
+
+// the bottom-left key — kept in sync with currentColors so it always shows
+// the wall's actual live colors instead of a hardcoded snapshot that goes
+// stale the moment someone customizes a type in the Style panel. Curated
+// order (not TYPE_LABELS' insertion order) for readability.
+// Deliberately READ-ONLY (not clickable) — all editing happens in exactly
+// one place, the 🎨 Style panel, per explicit owner direction: the key
+// having its own click-to-edit shortcut felt like a second place to edit
+// things, undermining "one spot for everything."
+const LEGEND_ORDER = [
+  ['center',''], ['branch',''], ['confirmed','✓ '], ['warning','⚠ '],
+  ['danger','? '], ['bomb','💣 '], ['entity','🏢 '], ['person','👤 '],
+  ['fbi','🔵 '], ['keyfind','★ '], ['dissolved','💀 '], ['replacement','🔁 '],
+  ['sticky','📝 '], ['film','🎬 '],
+];
+function renderLegend(){
+  const el = document.getElementById('legendItems');
+  if(!el || typeof currentColors === 'undefined') return;
+  el.innerHTML = LEGEND_ORDER.filter(([type]) => currentColors[type] && TYPE_LABELS[type]).map(([type, icon]) => {
+    const c = currentColors[type];
+    const swatchStyle = type === 'sticky'
+      ? 'border-radius:3px;background:'+hsl(c.fillH,c.fillS,c.fillL)+';border:1px solid '+hsl(c.borderH,c.borderS,c.borderL)+';'
+      : 'background:'+hsl(c.fillH,c.fillS,c.fillL)+';border:1px solid '+hsl(c.borderH,c.borderS,c.borderL)+';';
+    return '<div class="legendRow">'+
+      '<span class="dot" style="'+swatchStyle+'"></span> '+icon+escapeHtml(TYPE_LABELS[type])+
+    '</div>';
+  }).join('');
+}
+
+// ---- hex <-> HSL, so the panel can use native color pickers ----
+function hslToHex(h,s,l){
+  s/=100; l/=100;
+  const k = n => (n + h/30) % 12;
+  const a = s * Math.min(l, 1-l);
+  const f = n => l - a*Math.max(-1, Math.min(k(n)-3, Math.min(9-k(n), 1)));
+  const toHex = x => Math.round(255*x).toString(16).padStart(2,'0');
+  return '#'+toHex(f(0))+toHex(f(8))+toHex(f(4));
+}
+function hexToHsl(hex){
+  const r = parseInt(hex.slice(1,3),16)/255, g = parseInt(hex.slice(3,5),16)/255, b = parseInt(hex.slice(5,7),16)/255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  let h=0, s=0, l=(max+min)/2;
+  if(max !== min){
+    const d = max-min;
+    s = l > 0.5 ? d/(2-max-min) : d/(max+min);
+    if(max===r) h = (g-b)/d + (g<b?6:0);
+    else if(max===g) h = (b-r)/d + 2;
+    else h = (r-g)/d + 4;
+    h /= 6;
+  }
+  return { h: Math.round(h*360), s: Math.round(s*100), l: Math.round(l*100) };
+}
+
+// ---- unified style panel state ----
+let colorPanelTab = 'types';
+let colorPanelShapeId = null;
+const CP_TABS = [['types','Node types'],['node','This node'],['bg','Background'],['shapes','Shapes']];
+
+function openColorPanel(opts){
+  opts = opts || {};
+  colorPanelTab = opts.tab || 'types';
+  colorPanelShapeId = opts.shapeId !== undefined ? opts.shapeId : null;
+  renderColorPanel();
+  document.getElementById('colorPanelOverlay').style.display = 'flex';
+}
+function closeColorPanel(){
+  document.getElementById('colorPanelOverlay').style.display = 'none';
+}
+
+function hsl(h,s,l){ return 'hsl('+h+','+s+'%,'+l+'%)'; }
+
+function renderColorPanel(){
+  const c = document.getElementById('colorPanelContent');
+  let html = '<h2>Style</h2>';
+  html += '<div class="colorPanelHint">Every color, text style, size, node, and background shape lives here — changes save automatically.</div>';
+  html += '<div class="cpTabs">'+CP_TABS.map(([id,label])=>
+    '<button type="button" class="cpTab'+(colorPanelTab===id?' active':'')+'" data-cptab="'+id+'">'+label+'</button>'
+  ).join('')+'</div>';
+  html += '<div id="cpTabBody">';
+  if(colorPanelTab === 'types') html += renderTypesTab();
+  else if(colorPanelTab === 'node') html += renderNodeTab();
+  else if(colorPanelTab === 'bg') html += renderBgTab();
+  else html += renderShapesTab();
+  html += '</div>';
+
+  html += '<div class="formButtons">'+
+    '<button class="saveBtn" onclick="closeColorPanel()" style="background:#2a5008;color:#fff;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:600;cursor:pointer;flex:1;">Done</button>'+
+    (colorPanelTab === 'types' || colorPanelTab === 'bg'
+      ? '<button class="cancelBtn" onclick="resetColorsToDefault()" style="background:#eee;color:#555;border:none;border-radius:8px;padding:11px 16px;font-size:13px;cursor:pointer;">Reset colors to default</button>'
+      : '')+
+  '</div>';
+
+  c.innerHTML = html;
+  wireColorPanel();
+}
+
+function renderTypesTab(){
+  let html = '';
+  Object.keys(TYPE_LABELS).forEach(type=>{
+    const col = currentColors[type];
+    const sizePct = Math.round((col.sizeScale||1.0)*100);
+    html += '<details class="cpSection" data-type="'+type+'">'+
+      '<summary>'+
+        '<span id="swatch_'+type+'" style="width:26px;height:26px;border-radius:50%;flex-shrink:0;background:'+hsl(col.fillH,col.fillS,col.fillL)+';border:3px solid '+hsl(col.borderH,col.borderS,col.borderL)+';"></span>'+
+        '<span style="font-weight:600;font-size:12.5px;">'+TYPE_LABELS[type]+'</span>'+
+      '</summary>'+
+      '<div class="cpBody">'+
+        '<div class="cpGroupLabel">Color</div>'+
+        '<div class="cpColorRow">'+
+          '<label>fill</label><input type="color" data-type="'+type+'" data-cfield="fill" value="'+hslToHex(col.fillH,col.fillS,col.fillL)+'">'+
+          '<label>border</label><input type="color" data-type="'+type+'" data-cfield="border" value="'+hslToHex(col.borderH,col.borderS,col.borderL)+'">'+
+        '</div>'+
+        '<div class="cpGroupLabel">Text</div>'+
+        '<div class="cpColorRow">'+
+          '<label>color</label><input type="color" data-type="'+type+'" data-plainfield="textColor" value="'+(col.textColor||'#ffffff')+'">'+
+        '</div>'+
+        sliderLine(type,'fontSize','size',col.fontSize||22,12,36,'px')+
+        sliderLine(type,'weight','bold',col.weight||800,400,1000)+
+        sliderLine(type,'lineH','line',col.lineH||124,90,200)+
+        '<div class="cpGroupLabel">Shape</div>'+
+        sliderNumLine(type,'sizeScale','size',sizePct,25,500,'%')+
+        sliderLine(type,'borderW','edge',col.borderW ?? (type==='sticky'?4:9),0,20)+
+        (type==='sticky' ? sliderLine(type,'radius','corner',col.radius ?? 10,0,40) : '')+
+      '</div>'+
+    '</details>';
+  });
+  return html;
+}
+
+function renderBgTab(){
+  const pg = currentColors[PAGE_BG_KEY];
+  return '<div class="cpGroupLabel">Board</div>'+
+    '<div class="cpColorRow">'+
+      '<label>background</label><input type="color" data-type="'+PAGE_BG_KEY+'" data-cfield="fill" value="'+hslToHex(pg.fillH,pg.fillS,pg.fillL)+'">'+
+      '<label>dot</label><input type="color" data-type="'+PAGE_BG_KEY+'" data-cfield="border" value="'+hslToHex(pg.borderH,pg.borderS,pg.borderL)+'">'+
+    '</div>'+
+    sliderLine(PAGE_BG_KEY,'fillA','opacity',pg.fillA==null?100:pg.fillA,0,100)+
+    '<div class="cpGroupLabel">Text (section headers &amp; subtitles)</div>'+
+    '<div class="cpColorRow">'+
+      '<label>section header text</label><input type="color" data-type="'+PAGE_BG_KEY+'" data-plainfield="headerText" value="'+(pg.headerText||'#1a1a1a')+'">'+
+      '<label>section subtitle text</label><input type="color" data-type="'+PAGE_BG_KEY+'" data-plainfield="subText" value="'+(pg.subText||'#999999')+'">'+
+    '</div>';
+}
+
+// Everything about ONE specific node (content, photo/map/video fill, and
+// text style) lives in a single editor (openEditForm/#editFormOverlay) —
+// this tab is just a way to find/reach it without hunting on the canvas,
+// not a second place that edits the node itself. Picking a node from the
+// dropdown opens that editor directly instead of rendering a second,
+// separate set of controls here (that used to duplicate text-style
+// controls that also lived in openEditForm, which was confusing/felt
+// like two different places to edit the same thing — merged 2026-07-07).
+function renderNodeTab(){
+  const sorted = NODES.slice().sort((a,b)=>a.label.localeCompare(b.label));
+  const opts = sorted.map(n=>'<option value="'+n.id+'">'+
+    escapeHtml(n.label.replace(/\n/g,' '))+'</option>').join('');
+  return '<div style="opacity:.7;font-size:12px;margin-bottom:12px;line-height:1.5;">Content, photo/map/video, and text style for one specific node all live together in its own editor. Pick a node below, or just click it directly on the wall in edit mode.</div>'+
+    '<div class="cpNodeSelectRow">'+
+      '<select id="cp_nodeSelect"><option value="">— choose a node —</option>'+opts+'</select>'+
+      '<button type="button" class="addBtn" id="cp_newNode" style="white-space:nowrap;">+ New node</button>'+
+    '</div>';
+}
+
+function renderShapesTab(){
+  const arr = window.wallPanels ? window.wallPanels() : [];
+  const showZones = window.wallOv ? !!window.wallOv().__showZones : false;
+  let html = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">'+
+      '<button type="button" class="addBtn" id="cp_drawPanel">⬠ Draw new shape</button>'+
+      '<label style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:#666;margin-left:auto;">'+
+        '<input type="checkbox" id="cp_zonesToggle" '+(showZones?'checked':'')+'> show zones &amp; clusters'+
+      '</label>'+
+    '</div>';
+  if(!arr.length){
+    html += '<div style="opacity:.6;font-size:12px;padding:6px 0 14px;">No background shapes yet — draw one above.</div>';
+  }
+  arr.slice().reverse().forEach((p, ri)=>{
+    const i = arr.length - 1 - ri;
+    html += '<details class="cpSection" data-panelidx="'+i+'"'+(p.id===colorPanelShapeId?' open':'')+'>'+
+      '<summary>'+
+        '<span style="width:26px;height:26px;border-radius:6px;flex-shrink:0;background:'+window.wallHslaC(p.fill)+';border:2px solid rgba(0,0,0,.15);"></span>'+
+        '<span style="font-weight:600;font-size:12.5px;flex:1;">'+escapeHtml(p.label||'Untitled shape')+'</span>'+
+        '<span style="font-size:11px;color:'+(p.hidden?'#c88':'#888')+';">'+(p.hidden?'hidden':'visible')+'</span>'+
+      '</summary>'+
+      '<div class="cpBody">'+
+        '<label style="display:block;font-size:10px;text-transform:uppercase;color:#888;margin-bottom:4px;">label</label>'+
+        '<input type="text" data-panelfield="label" data-panelidx="'+i+'" value="'+escapeAttr(p.label||'')+'" style="width:100%;padding:7px 9px;border:1px solid #ddd;border-radius:6px;font-size:12px;margin-bottom:10px;">'+
+        '<div class="cpColorRow"><label>fill</label><input type="color" data-panelfield="color" data-panelidx="'+i+'" value="'+hslToHex(p.fill.h,p.fill.s,p.fill.l)+'"></div>'+
+        '<div class="sliderLine"><label>alpha</label><input type="range" data-panelfield="alpha" data-panelidx="'+i+'" min="0" max="100" value="'+(p.fill.a==null?100:p.fill.a)+'"><span class="val">'+(p.fill.a==null?100:p.fill.a)+'</span></div>'+
+        '<label style="display:flex;gap:6px;align-items:center;font-size:12px;margin:8px 0;"><input type="checkbox" data-panelfield="outline" data-panelidx="'+i+'" '+(p.outline?'checked':'')+'> solid outline</label>'+
+        '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">'+
+          '<button type="button" class="addBtn" data-panelaction="eye" data-panelidx="'+i+'">'+(p.hidden?'👁 show':'🙈 hide')+'</button>'+
+          '<button type="button" class="addBtn" data-panelaction="up" data-panelidx="'+i+'">↑</button>'+
+          '<button type="button" class="addBtn" data-panelaction="down" data-panelidx="'+i+'">↓</button>'+
+          '<button type="button" class="addBtn" data-panelaction="redraw" data-panelidx="'+i+'">↻ redraw</button>'+
+          '<button type="button" data-panelaction="delete" data-panelidx="'+i+'" style="background:#fce8e8;color:#a01818;border:1px solid #e0a0a0;border-radius:6px;padding:5px 10px;font-size:11.5px;cursor:pointer;">delete</button>'+
+        '</div>'+
+      '</div>'+
+    '</details>';
+  });
+  return html;
+}
+
+function sliderLine(type, field, label, val, min, max, unit){
+  unit = unit || '';
+  return '<div class="sliderLine">'+
+    '<label>'+label+'</label>'+
+    '<input type="range" min="'+min+'" max="'+max+'" value="'+val+'" data-type="'+type+'" data-field="'+field+'" data-unit="'+unit+'">'+
+    '<span class="val">'+val+unit+'</span>'+
+  '</div>';
+}
+
+// paired range + typeable number, both bound to the same field — the
+// range gives fast coarse dragging, the number lets you enter an exact
+// value directly instead of being limited to whatever the slider's max
+// happens to be (e.g. node size used to hard-cap at 200% with no way to
+// go bigger except dragging a resize handle on one node at a time)
+function sliderNumLine(type, field, label, val, min, max, unit){
+  unit = unit || '';
+  return '<div class="sliderLine sliderNumLine">'+
+    '<label>'+label+'</label>'+
+    '<input type="range" min="'+min+'" max="'+max+'" value="'+val+'" data-type="'+type+'" data-field="'+field+'" data-unit="'+unit+'" data-pair="num">'+
+    '<input type="number" min="'+min+'" value="'+val+'" data-type="'+type+'" data-field="'+field+'" data-unit="'+unit+'" data-pair="range" class="sliderNum">'+
+    (unit ? '<span class="val" style="width:auto;">'+unit+'</span>' : '')+
+  '</div>';
+}
+
+function wireColorPanel(){
+  const c = document.getElementById('colorPanelContent');
+
+  c.querySelectorAll('.cpTab').forEach(b=>{
+    b.addEventListener('click', ()=>{ colorPanelTab = b.dataset.cptab; renderColorPanel(); });
+  });
+
+  // ---- type & background sliders (bold/line/edge/corner/alpha/etc) ----
+  // (excludes paired range+number controls like node size, wired separately below)
+  c.querySelectorAll('input[type=range][data-type]:not([data-pair])').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const type = e.target.dataset.type, field = e.target.dataset.field;
+      const rawVal = +e.target.value;
+      currentColors[type][field] = rawVal;
+      e.target.nextElementSibling.textContent = rawVal + (e.target.dataset.unit || '');
+      applyColorStyles();
+      saveColors(currentColors);
+    });
+  });
+
+  // ---- paired range + typeable number (currently just node size) ----
+  // dragging the range OR typing a number both update the same field;
+  // each keeps the other in sync so they never show conflicting values
+  c.querySelectorAll('input[data-pair]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const type = e.target.dataset.type, field = e.target.dataset.field;
+      const rawVal = +e.target.value;
+      if(!rawVal && rawVal !== 0) return; // ignore a momentarily-empty number field mid-typing
+      const pairSelector = 'input[data-type="'+type+'"][data-field="'+field+'"][type='+(e.target.type==='range'?'number':'range')+']';
+      const pairEl = e.target.closest('.sliderLine').querySelector(pairSelector);
+      if(pairEl) pairEl.value = rawVal;
+      if(field === 'sizeScale'){
+        currentColors[type][field] = rawVal / 100; // stored as a 0.25-5.0 multiplier, inputs show it as a %
+        resizeAllNodesOfType(type);
+      } else {
+        currentColors[type][field] = rawVal;
+        applyColorStyles();
+      }
+      saveColors(currentColors);
+    });
+  });
+
+  // ---- type & background color pickers (fill/border) ----
+  c.querySelectorAll('input[type=color][data-cfield]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const type = e.target.dataset.type, field = e.target.dataset.cfield;
+      const got = hexToHsl(e.target.value);
+      const col = currentColors[type];
+      if(field === 'fill'){ col.fillH = got.h; col.fillS = got.s; col.fillL = got.l; }
+      else { col.borderH = got.h; col.borderS = got.s; col.borderL = got.l; }
+      const sw = document.getElementById('swatch_'+type);
+      if(sw){
+        sw.style.background = type === PAGE_BG_KEY
+          ? `hsla(${col.fillH},${col.fillS}%,${col.fillL}%,${(col.fillA==null?100:col.fillA)/100})`
+          : hsl(col.fillH,col.fillS,col.fillL);
+        sw.style.borderColor = hsl(col.borderH,col.borderS,col.borderL);
+      }
+      applyColorStyles();
+      saveColors(currentColors);
+    });
+  });
+
+  // ---- plain (non-HSL) colors, e.g. text color for any type, or the
+  // section header/subtitle text (which lives on the __page pseudo-type) ----
+  c.querySelectorAll('input[type=color][data-plainfield]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      currentColors[e.target.dataset.type][e.target.dataset.plainfield] = e.target.value;
+      applyColorStyles();
+      saveColors(currentColors);
+    });
+  });
+
+  // ---- this-node tab: just a finder, the editor itself lives in openEditForm ----
+  const nodeSelect = document.getElementById('cp_nodeSelect');
+  if(nodeSelect) nodeSelect.addEventListener('change', e=>{
+    const id = e.target.value || null;
+    if(!id) return;
+    const n = nodeMap[id];
+    if(!n) return;
+    closeColorPanel();
+    openEditForm(n);
+  });
+  const newNodeBtn = document.getElementById('cp_newNode');
+  if(newNodeBtn) newNodeBtn.addEventListener('click', ()=>{
+    closeColorPanel();
+    if(window.wallAddNode) window.wallAddNode();
+  });
+
+  // ---- shapes tab ----
+  const drawBtn = document.getElementById('cp_drawPanel');
+  if(drawBtn) drawBtn.addEventListener('click', ()=>{
+    closeColorPanel();
+    if(window.wallStartDraw) window.wallStartDraw();
+  });
+  const zonesToggle = document.getElementById('cp_zonesToggle');
+  if(zonesToggle) zonesToggle.addEventListener('change', e=>{
+    if(!window.wallOv) return;
+    window.wallOv().__showZones = e.target.checked;
+    if(window.wallApplyZoneVis) window.wallApplyZoneVis();
+    if(window.wallSavePanels) window.wallSavePanels();
+  });
+  c.querySelectorAll('[data-panelfield]').forEach(el=>{
+    const evt = (el.type === 'checkbox' || el.tagName === 'SELECT') ? 'change' : 'input';
+    el.addEventListener(evt, e=>{
+      const idx = +e.target.dataset.panelidx;
+      const p = window.wallPanels()[idx];
+      if(!p) return;
+      const field = e.target.dataset.panelfield;
+      if(field === 'label') p.label = e.target.value;
+      else if(field === 'color'){ const got = hexToHsl(e.target.value); p.fill.h = got.h; p.fill.s = got.s; p.fill.l = got.l; }
+      else if(field === 'alpha'){ p.fill.a = +e.target.value; e.target.nextElementSibling.textContent = e.target.value; }
+      else if(field === 'outline') p.outline = e.target.checked;
+      window.wallRenderPanels();
+      window.wallSavePanels();
+    });
+  });
+  c.querySelectorAll('[data-panelaction]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const idx = +btn.dataset.panelidx;
+      const arr = window.wallPanels();
+      const p = arr[idx];
+      if(!p) return;
+      const act = btn.dataset.panelaction;
+      if(act === 'eye'){ p.hidden = !p.hidden; window.wallSavePanels(); window.wallRenderPanels(); renderColorPanel(); }
+      if(act === 'up' && idx < arr.length-1){ arr.splice(idx,1); arr.splice(idx+1,0,p); window.wallSavePanels(); window.wallRenderPanels(); renderColorPanel(); }
+      if(act === 'down' && idx > 0){ arr.splice(idx,1); arr.splice(idx-1,0,p); window.wallSavePanels(); window.wallRenderPanels(); renderColorPanel(); }
+      if(act === 'redraw'){ closeColorPanel(); window.wallStartDraw(p.id); }
+      if(act === 'delete'){
+        if(!confirm('Delete this shape?')) return;
+        arr.splice(idx,1);
+        window.wallSavePanels(); window.wallRenderPanels(); renderColorPanel();
+      }
+    });
+  });
+}
+
+function resizeAllNodesOfType(type){
+  NODES.filter(n=>n.type===type).forEach(n=>{
+    const el = nodeElMap[n.id];
+    if(el) positionNodeEl(el, n);
+  });
+}
+
+function resetColorsToDefault(){
+  if(!confirm('Reset all node colors and sizes back to the original defaults? This does not affect positions or text.')) return;
+  currentColors = JSON.parse(JSON.stringify(DEFAULT_COLORS));
+  saveColors(currentColors);
+  applyColorStyles();
+  Object.keys(TYPE_LABELS).forEach(type=>resizeAllNodesOfType(type));
+  renderColorPanel();
+}
+
+// ============================================================
+// VIEW TRANSFORM (pan/zoom — unchanged behavior)
+// ============================================================
+function applyTransform(){
+  world.style.transform = `translate(${-originX*scale}px, ${-originY*scale}px) scale(${scale})`;
+  document.getElementById('zoomLabel').textContent = Math.round(scale*100)+'%';
+}
+
+function zoomBy(factor, cx, cy){
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  if(cx===undefined) cx = vw/2;
+  if(cy===undefined) cy = vh/2;
+  const worldX = originX + cx/scale;
+  const worldY = originY + cy/scale;
+  scale = Math.min(2.2, Math.max(0.18, scale*factor));
+  originX = worldX - cx/scale;
+  originY = worldY - cy/scale;
+  applyTransform();
+}
+
+function resetView(){
+  scale = 0.62; originX=-60; originY=-40;
+  applyTransform();
+}
+
+function fitAll(){
+  if(NODES.length===0) return;
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  NODES.forEach(n=>{
+    minX=Math.min(minX,n.x-100); maxX=Math.max(maxX,n.x+100);
+    minY=Math.min(minY,n.y-100); maxY=Math.max(maxY,n.y+100);
+  });
+  ZONES.forEach(z=>{
+    minX=Math.min(minX,z.x-20); maxX=Math.max(maxX,z.x+z.w+20);
+    minY=Math.min(minY,z.y-20); maxY=Math.max(maxY,z.y+z.h+20);
+  });
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  const worldW = maxX-minX, worldH = maxY-minY;
+  scale = Math.min(vw/worldW, vh/worldH, 1.3);
+  scale = Math.max(scale, 0.15);
+  originX = minX - (vw/scale - worldW)/2;
+  originY = minY - (vh/scale - worldH)/2;
+  applyTransform();
+}
+
+// ---- background panning (only when not dragging a node) ----
+viewport.addEventListener('mousedown', e=>{
+  if(e.target.closest('.node')) return;
+  panning = true;
+  viewport.classList.add('panning');
+  panStartX = e.clientX; panStartY = e.clientY;
+  originStartX = originX; originStartY = originY;
+});
+window.addEventListener('mousemove', e=>{
+  if(!panning) return;
+  const dx = (e.clientX - panStartX)/scale;
+  const dy = (e.clientY - panStartY)/scale;
+  originX = originStartX - dx;
+  originY = originStartY - dy;
+  applyTransform();
+});
+window.addEventListener('mouseup', ()=>{
+  panning = false;
+  viewport.classList.remove('panning');
+});
+
+let touchStartDist=null, touchStartScale=1;
+viewport.addEventListener('touchstart', e=>{
+  if(e.touches.length===1){
+    if(e.target.closest('.node')) return;
+    panning=true;
+    panStartX=e.touches[0].clientX; panStartY=e.touches[0].clientY;
+    originStartX=originX; originStartY=originY;
+  } else if(e.touches.length===2){
+    panning=false;
+    const dx=e.touches[0].clientX-e.touches[1].clientX;
+    const dy=e.touches[0].clientY-e.touches[1].clientY;
+    touchStartDist=Math.hypot(dx,dy);
+    touchStartScale=scale;
+  }
+},{passive:true});
+viewport.addEventListener('touchmove', e=>{
+  if(e.touches.length===1 && panning){
+    const dx=(e.touches[0].clientX-panStartX)/scale;
+    const dy=(e.touches[0].clientY-panStartY)/scale;
+    originX=originStartX-dx; originY=originStartY-dy;
+    applyTransform();
+  } else if(e.touches.length===2 && touchStartDist){
+    const dx=e.touches[0].clientX-e.touches[1].clientX;
+    const dy=e.touches[0].clientY-e.touches[1].clientY;
+    const dist=Math.hypot(dx,dy);
+    const factor=(dist/touchStartDist);
+    scale = Math.min(2.2, Math.max(0.18, touchStartScale*factor));
+    applyTransform();
+  }
+},{passive:true});
+viewport.addEventListener('touchend', ()=>{ panning=false; touchStartDist=null; });
+
+// plain wheel / two-finger trackpad scroll pans (like Figma/Miro/Google
+// Maps) — pinch-to-zoom on a trackpad fires wheel events with ctrlKey set
+// automatically (a browser convention, not an actual Ctrl key press), so
+// that + an actual Ctrl/Cmd+scroll are the only things that zoom.
+viewport.addEventListener('wheel', e=>{
+  e.preventDefault();
+  if(e.ctrlKey || e.metaKey){
+    const rect = viewport.getBoundingClientRect();
+    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+    const factor = Math.exp(-e.deltaY * 0.01);
+    zoomBy(factor, cx, cy);
+  } else {
+    originX += e.deltaX/scale;
+    originY += e.deltaY/scale;
+    applyTransform();
+  }
+},{passive:false});
+
+// ============================================================
+// ZONE / CLUSTER RENDERING
+// ============================================================
+const zoneElMap = {};
+function renderZones(){
+  ZONES.forEach(z=>{
+    const el = document.createElement('div');
+    el.className = 'zone ' + z.cls;
+    el.style.left = z.x+'px'; el.style.top = z.y+'px';
+    el.style.width = z.w+'px'; el.style.height = z.h+'px';
+    const lbl = document.createElement('div');
+    lbl.className = 'zone-label'; lbl.textContent = z.label;
+    const sub = document.createElement('div');
+    sub.className = 'zone-sublabel'; sub.textContent = z.sublabel;
+    el.appendChild(lbl); el.appendChild(sub);
+    el.addEventListener('click', e => {
+      if(!editMode) return;
+      e.stopPropagation();
+      openZoneEditor(z);
+    });
+    world.insertBefore(el, svg);
+    zoneElMap[z.id] = { el, lbl, sub };
+  });
+}
+
+// click a background zone in edit mode to rename its label/sublabel —
+// zones have no per-node edit form of their own, so this is a small
+// standalone overlay, matching the card look used elsewhere
+function openZoneEditor(z){
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(20,18,14,0.5);z-index:520;display:flex;align-items:center;justify-content:center;';
+  ov.addEventListener('click', e => { if(e.target === ov) ov.remove(); });
+  ov.innerHTML =
+    '<div style="background:#fffdf8;border-radius:12px;width:420px;max-width:92vw;padding:24px;font-size:13px;color:#2a2a2a;box-shadow:0 10px 40px rgba(0,0,0,.35);">'+
+      '<h2 style="font-size:16px;margin-bottom:14px;">Edit background label</h2>'+
+      '<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#888;margin-bottom:5px;">Label</label>'+
+      '<input type="text" id="zoneLabelInp" value="'+escapeAttr(z.label||'')+'" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:7px;font-size:13px;margin-bottom:14px;">'+
+      '<label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#888;margin-bottom:5px;">Sublabel</label>'+
+      '<input type="text" id="zoneSubInp" value="'+escapeAttr(z.sublabel||'')+'" style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:7px;font-size:13px;margin-bottom:18px;">'+
+      '<div style="display:flex;gap:10px;">'+
+        '<button id="zoneSaveBtn" style="flex:1;background:#2a5008;color:#fff;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:600;cursor:pointer;">Save</button>'+
+        '<button id="zoneCancelBtn" style="background:#eee;color:#555;border:none;border-radius:8px;padding:11px 18px;font-size:14px;cursor:pointer;">Cancel</button>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(ov);
+  document.getElementById('zoneCancelBtn').onclick = () => ov.remove();
+  document.getElementById('zoneSaveBtn').onclick = () => {
+    z.label = document.getElementById('zoneLabelInp').value.trim();
+    z.sublabel = document.getElementById('zoneSubInp').value.trim();
+    const rendered = zoneElMap[z.id];
+    if(rendered){ rendered.lbl.textContent = z.label; rendered.sub.textContent = z.sublabel; }
+    const o = (typeof overrides === 'object' && overrides) ? overrides : {};
+    o.__zones = o.__zones || {};
+    o.__zones[z.id] = { label: z.label, sublabel: z.sublabel };
+    saveOverrides(o);
+    ov.remove();
+  };
+}
+
+function renderClusters(){
+  if(typeof CLUSTERS === 'undefined') return;
+  CLUSTERS.forEach(c=>{
+    const el = document.createElement('div');
+    el.className = 'cluster ' + c.cls;
+    el.style.left = c.x+'px'; el.style.top = c.y+'px';
+    el.style.width = c.w+'px'; el.style.height = c.h+'px';
+    const lbl = document.createElement('div');
+    lbl.className = 'cluster-label'; lbl.textContent = c.label;
+    el.appendChild(lbl);
+    world.insertBefore(el, svg);
+  });
+}
+
+// ============================================================
+// NODE RENDERING
+// ============================================================
+const nodeMap = {};
+const nodeElMap = {};
+
+// fills the whole node with a picture (person, building, whatever), a
+// live embedded map of a place, or a looping video — shared by every place
+// that builds a node's innerHTML. Only one fill at a time: mapEmbed wins
+// over videoEmbed, which wins over photo.
+// tiny geocode cache shared by every node-embedded map (kept local to this
+// function rather than reused from the Map & Locations script block, since
+// that block loads later and a node's map can render before it has run)
+const _nodeMapGeoCache = {};
+async function geocodeForNode(query){
+  if(_nodeMapGeoCache[query] !== undefined) return _nodeMapGeoCache[query];
+  try{
+    const r = await fetch('/api/geocode?q=' + encodeURIComponent(query));
+    const j = r.ok ? await r.json() : null;
+    _nodeMapGeoCache[query] = j;
+    return j;
+  }catch(e){ _nodeMapGeoCache[query] = null; return null; }
+}
+// accepts a bare YouTube id, or a youtube.com/youtu.be URL of any common shape
+function extractYouTubeId(input){
+  if(!input) return null;
+  const s = input.trim();
+  if(/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
+  const m = s.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+function applyNodePhoto(el, n){
+  if(n.mapEmbed){
+    el.classList.add('has-map');
+    const holder = document.createElement('div');
+    holder.className = 'node-map';
+    el.insertBefore(holder, el.firstChild);
+    const query = n.mapEmbed;
+    geocodeForNode(query).then(hit => {
+      if(!hit || !el.isConnected || n.mapEmbed !== query) return; // node changed/removed since the fetch started
+      if(typeof L === 'undefined') return;
+      const map = L.map(holder, { attributionControl:false, zoomControl:false, dragging:false, scrollWheelZoom:false, doubleClickZoom:false, boxZoom:false, keyboard:false, touchZoom:false }).setView([hit.lat, hit.lon], 15);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(map);
+      L.marker([hit.lat, hit.lon]).addTo(map);
+    });
+    return;
+  }
+  if(n.videoEmbed){
+    el.classList.add('has-video');
+    const ytId = extractYouTubeId(n.videoEmbed);
+    if(ytId){
+      const iframe = document.createElement('iframe');
+      iframe.className = 'node-video';
+      iframe.src = 'https://www.youtube.com/embed/'+ytId+'?autoplay=1&mute=1&loop=1&playlist='+ytId+'&controls=0&modestbranding=1&playsinline=1';
+      iframe.setAttribute('allow', 'autoplay; encrypted-media');
+      iframe.setAttribute('frameborder', '0');
+      iframe.style.pointerEvents = 'none';
+      el.insertBefore(iframe, el.firstChild);
+    } else {
+      const video = document.createElement('video');
+      video.className = 'node-video';
+      video.src = n.videoEmbed;
+      video.autoplay = true; video.muted = true; video.loop = true; video.playsInline = true;
+      video.onerror = () => { video.remove(); el.classList.remove('has-video'); };
+      el.insertBefore(video, el.firstChild);
+    }
+    return;
+  }
+  if(!n.photo) return;
+  el.classList.add('has-photo');
+  const img = document.createElement('img');
+  img.className = 'node-photo';
+  img.src = n.photo;
+  img.alt = '';
+  img.onerror = () => { img.remove(); el.classList.remove('has-photo'); };
+  el.insertBefore(img, el.firstChild);
+}
+
+function renderNodes(){
+  NODES.forEach(n=>{
+    const el = document.createElement('div');
+    el.className = 'node ' + n.type;
+    el.id = 'node-'+n.id;
+    positionNodeEl(el, n);
+    applyNodePhoto(el, n);
+
+    if(n.avatar){
+      const av = document.createElement('div');
+      av.className = 'avatar';
+      renderAvatarInto(av, n.avatar);
+      el.appendChild(av);
+    }
+
+    const span = document.createElement('span');
+    span.className = 'lbl';
+    span.innerHTML = escapeHtml(n.label).replace(/\n/g,'<br>') + (n.detail ? '<span class="clickhint">click for details</span>' : '');
+    el.appendChild(span);
+    applyResizeHandle(el);
+    applyNodeTextStyle(el, n);
+
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if(editMode){ openEditForm(n); }
+      else if(n.detail){ openDetail(n); }
+    });
+    attachDrag(el, n);
+    attachResize(el, n);
+
+    world.appendChild(el);
+    nodeMap[n.id] = n;
+    nodeElMap[n.id] = el;
+  });
+}
+
+function positionNodeEl(el, n){
+  const w = n.sizeOverride || sizeFor(n.type, n.tier);
+  el.style.left = (n.x - w/2)+'px';
+  el.style.top = (n.y - w/2)+'px';
+  el.style.width = w+'px';
+  if(n.type !== 'sticky') el.style.height = w+'px';
+}
+
+// per-node text overrides (color / size / line-height / boldness) — the
+// 🎨 Style panel only controls whole TYPES, this is for one specific node.
+// Uses setProperty(...,'important') because the type-level style is
+// injected with !important too; an important inline style still wins.
+function applyNodeTextStyle(el, n){
+  const props = { color: n.textColor, 'font-size': n.fontSize, 'line-height': n.lineHeight, 'font-weight': n.fontWeight };
+  Object.entries(props).forEach(([prop, val]) => {
+    if(val) el.style.setProperty(prop, val, 'important');
+    else el.style.removeProperty(prop);
+  });
+}
+
+// small drag handle in the corner — Photoshop-style resize, edit mode only.
+// markup is added by every place that (re)builds a node's innerHTML;
+// the drag listeners are wired ONCE per node (delegated off the stable
+// outer element, since the handle itself gets recreated on every edit save)
+function applyResizeHandle(el){
+  const handle = document.createElement('div');
+  handle.className = 'resize-handle';
+  handle.title = 'Drag to resize · double-click to reset';
+  el.appendChild(handle);
+}
+function attachResize(el, n){
+  let resizing = false, startClientX = 0, startClientY = 0, startSize = 0;
+  el.addEventListener('mousedown', e=>{
+    if(!editMode || !e.target.classList.contains('resize-handle')) return;
+    e.stopPropagation(); e.preventDefault();
+    resizing = true;
+    startClientX = e.clientX; startClientY = e.clientY;
+    startSize = n.sizeOverride || sizeFor(n.type, n.tier);
+  });
+  window.addEventListener('mousemove', e=>{
+    if(!resizing) return;
+    const d = Math.max(e.clientX - startClientX, e.clientY - startClientY) / scale;
+    n.sizeOverride = Math.max(60, Math.min(560, Math.round(startSize + d)));
+    positionNodeEl(el, n);
+    redrawEdgesForNode(n.id);
+  });
+  window.addEventListener('mouseup', ()=>{
+    if(!resizing) return;
+    resizing = false;
+    persistNode(n);
+  });
+  el.addEventListener('dblclick', e=>{
+    if(!editMode || !e.target.classList.contains('resize-handle')) return;
+    e.stopPropagation();
+    delete n.sizeOverride;
+    positionNodeEl(el, n);
+    redrawEdgesForNode(n.id);
+    persistNode(n);
+  });
+}
+
+// avatar can be a short emoji string OR an image URL (http... / data:image...)
+function renderAvatarInto(container, avatar){
+  container.innerHTML = '';
+  if(/^(https?:|data:image)/.test(avatar)){
+    const img = document.createElement('img');
+    img.src = avatar;
+    img.style.width = '100%'; img.style.height = '100%';
+    img.style.borderRadius = '50%'; img.style.objectFit = 'cover';
+    img.onerror = ()=>{ container.textContent = '👤'; };
+    container.appendChild(img);
+  } else {
+    container.textContent = avatar;
+  }
+}
+
+function sizeFor(type, tier){
+  let base;
+  switch(type){
+    case 'center': base = 256; break;
+    case 'sticky': base = 220; break;
+    case 'branch': base = 180; break;
+    case 'bomb': base = 170; break;
+    case 'person': case 'fbi': base = 176; break;
+    case 'keyfind': base = 180; break;
+    case 'replacement': base = 170; break;
+    default: base = 152;
+  }
+  const mult = (type==='center' || type==='sticky') ? 1.0 : (tier===1 ? 1.4 : tier===3 ? 0.72 : 1.0);
+  const scale = (currentColors[type] && currentColors[type].sizeScale) || 1.0;
+  return Math.round(base * mult * scale);
+}
+
+// ============================================================
+// DRAG TO REPOSITION (edit mode only)
+// ============================================================
+function attachDrag(el, n){
+  let dragging = false, startClientX=0, startClientY=0, startNodeX=0, startNodeY=0;
+
+  el.addEventListener('mousedown', e=>{
+    if(!editMode || e.target.classList.contains('resize-handle')) return;
+    e.stopPropagation();
+    dragging = true;
+    el.classList.add('dragging');
+    startClientX = e.clientX; startClientY = e.clientY;
+    startNodeX = n.x; startNodeY = n.y;
+  });
+
+  window.addEventListener('mousemove', e=>{
+    if(!dragging) return;
+    const dx = (e.clientX - startClientX)/scale;
+    const dy = (e.clientY - startClientY)/scale;
+    n.x = startNodeX + dx;
+    n.y = startNodeY + dy;
+    positionNodeEl(el, n);
+    redrawEdgesForNode(n.id);
+  });
+
+  window.addEventListener('mouseup', ()=>{
+    if(!dragging) return;
+    dragging = false;
+    el.classList.remove('dragging');
+    persistNode(n);
+  });
+
+  // touch support for dragging in edit mode
+  el.addEventListener('touchstart', e=>{
+    if(!editMode) return;
+    e.stopPropagation();
+    dragging = true;
+    el.classList.add('dragging');
+    startClientX = e.touches[0].clientX; startClientY = e.touches[0].clientY;
+    startNodeX = n.x; startNodeY = n.y;
+  },{passive:true});
+  el.addEventListener('touchmove', e=>{
+    if(!dragging) return;
+    const dx = (e.touches[0].clientX - startClientX)/scale;
+    const dy = (e.touches[0].clientY - startClientY)/scale;
+    n.x = startNodeX + dx;
+    n.y = startNodeY + dy;
+    positionNodeEl(el, n);
+    redrawEdgesForNode(n.id);
+  },{passive:true});
+  el.addEventListener('touchend', ()=>{
+    if(!dragging) return;
+    dragging = false;
+    el.classList.remove('dragging');
+    persistNode(n);
+  });
+}
+
+function redrawEdgesForNode(nodeId){
+  const lines = svg.querySelectorAll('line[data-from="'+nodeId+'"], line[data-to="'+nodeId+'"]');
+  lines.forEach(line=>{
+    const fromId = line.getAttribute('data-from');
+    const toId = line.getAttribute('data-to');
+    const a = nodeMap[fromId], b = nodeMap[toId];
+    if(!a||!b) return;
+    line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
+    line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
+  });
+}
+
+function renderEdges(){
+  svg.setAttribute('width','5000');
+  svg.setAttribute('height','2550');
+  EDGES.forEach(([fromId,toId,type])=>{
+    const a = nodeMap[fromId], b = nodeMap[toId];
+    if(!a||!b) return;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
+    line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
+    line.setAttribute('data-from', fromId);
+    line.setAttribute('data-to', toId);
+    let cls = 'web-line';
+    if(type && type!=='normal') cls += ' '+type;
+    line.setAttribute('class', cls);
+    svg.appendChild(line);
+  });
+}
+
+// ============================================================
+// EDIT MODE TOGGLE
+// ============================================================
+function toggleEditMode(){
+  editMode = !editMode;
+  document.body.classList.toggle('edit-mode', editMode);
+  const btn = document.getElementById('editModeBtn');
+  const hint = document.getElementById('hint');
+  if(editMode){
+    btn.textContent = '✏️ Edit mode: ON';
+    btn.classList.add('active');
+    hint.textContent = 'Edit mode: drag any circle to reposition · drag the ⤡ corner handle to resize · click a circle to edit its content';
+  } else {
+    btn.textContent = '✏️ Edit mode: OFF';
+    btn.classList.remove('active');
+    hint.textContent = 'Drag or scroll to pan · Pinch/Ctrl+scroll to zoom · Click a node for details';
+  }
+}
+
+// ============================================================
+// DETAIL PANEL (view mode)
+// ============================================================
+function openDetail(n){
+  const d = n.detail;
+  const overlay = document.getElementById('overlay');
+  const content = document.getElementById('detailContent');
+
+  let html = '';
+  html += '<div class="headerRow">';
+  if(n.avatar){
+    html += '<div class="avatarBig" id="detailAvatarBig"></div>';
+  }
+  html += '<div><h2>'+escapeHtml(d.title)+'</h2></div></div>';
+  if(d.subtitle) html += '<div class="subtitle">'+escapeHtml(d.subtitle)+'</div>';
+  if(d.tag) html += '<div class="tag '+d.tag+'">'+tagLabel(d.tag)+'</div>';
+  if(d.mapQuery){
+    html += '<button class="addBtn" data-maploc="'+escapeHtml(d.mapQuery)+'" style="margin-bottom:14px;">📍 View on map / Street View</button>';
+  }
+  if(d.video){
+    html += '<div style="position:relative;width:100%;aspect-ratio:16/9;margin:12px 0 14px;border-radius:10px;overflow:hidden;background:#000;">'+
+      '<iframe src="https://www.youtube-nocookie.com/embed/'+encodeURIComponent(d.video)+'" '+
+      'style="position:absolute;inset:0;width:100%;height:100%;border:0;" '+
+      'allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>';
+  }
+
+  d.sections.forEach(sec=>{
+    html += '<section><h3>'+escapeHtml(sec.h)+'</h3><ul>';
+    sec.items.forEach(item=>{
+      html += '<li>'+escapeHtml(item)+'</li>';
+    });
+    html += '</ul></section>';
+  });
+
+  if(d.docs && d.docs.length){
+    html += '<section><h3>Supporting documents &amp; links</h3>';
+    d.docs.forEach(doc=>{
+      if(doc.url){
+        html += '<div class="docItem"><span class="docIcon">&#128206;</span><span class="docLabel"><a href="'+escapeAttr(doc.url)+'" target="_blank" rel="noopener">'+escapeHtml(doc.label)+'</a></span></div>';
+      } else {
+        html += '<div class="docItem placeholder"><span class="docIcon">&#128206;</span><span class="docLabel">'+escapeHtml(doc.label)+' — link not yet added</span></div>';
+      }
+    });
+    html += '<div class="addDocHint">Turn on Edit mode and click this node to add real links and photos.</div>';
+    html += '</section>';
+  }
+
+  const connected = EDGES.filter(([f,t])=>f===n.id||t===n.id)
+    .map(([f,t])=>f===n.id?t:f)
+    .filter(id=>nodeMap[id]);
+  if(connected.length){
+    html += '<section><h3>Connected to</h3><div class="connections">';
+    connected.forEach(id=>{
+      const lbl = nodeMap[id].label.replace(/\n/g,' ');
+      html += '<span onclick="jumpTo(\''+id+'\')">'+escapeHtml(lbl)+'</span>';
+    });
+    html += '</div></section>';
+  }
+
+  content.innerHTML = html;
+  if(n.avatar){
+    renderAvatarInto(document.getElementById('detailAvatarBig'), n.avatar);
+  }
+  overlay.style.display = 'flex';
+}
+
+function closeDetail(){
+  document.getElementById('overlay').style.display = 'none';
+}
+
+function jumpTo(id){
+  closeDetail();
+  const n = nodeMap[id];
+  if(!n) return;
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  scale = Math.max(scale, 0.7);
+  originX = n.x - vw/(2*scale);
+  originY = n.y - vh/(2*scale);
+  applyTransform();
+  const el = document.getElementById('node-'+id);
+  if(el){
+    el.style.transform = 'scale(1.25)';
+    setTimeout(()=>{ el.style.transform=''; }, 600);
+  }
+}
+
+function tagLabel(tag){
+  const map = {
+    bomb:'\u{1F4A3} Bombshell', confirmed:'\u2713 Confirmed', warning:'\u26A0 Warning',
+    danger:'? Open Question', entity:'\u{1F3E2} Entity', person:'\u{1F464} Person',
+    fbi:'\u{1F535} FBI-Connected', keyfind:"\u2605 Key Finding", dissolved:'\u{1F480} Dissolved',
+    replacement:'\u{1F501} Replacement Entity', branch:'Topic', film:'\u{1F3AC} Video'
+  };
+  return map[tag] || tag;
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+function escapeAttr(str){
+  return str.replace(/"/g,'&quot;');
+}
+function rgbToHex(rgb){
+  const m = rgb.match(/\d+/g);
+  if(!m) return '#ffffff';
+  return '#'+m.slice(0,3).map(x => (+x).toString(16).padStart(2,'0')).join('');
+}
+
+// ============================================================
+// EDIT FORM (edit mode — full content editor)
+// ============================================================
+let editingNodeId = null;
+let editDraft = null; // working copy of detail being edited
+
+function ensureDetail(n){
+  if(!n.detail){
+    n.detail = { title: n.label.replace(/\n/g,' '), subtitle:'', tag: n.type, sections: [], docs: [] };
+  }
+  if(!n.detail.sections) n.detail.sections = [];
+  if(!n.detail.docs) n.detail.docs = [];
+  return n.detail;
+}
+
+function openEditForm(n){
+  editingNodeId = n.id;
+  const d = ensureDetail(n);
+  editDraft = JSON.parse(JSON.stringify(d)); // deep copy for editing
+  editDraft._label = n.label;
+  editDraft._avatar = n.avatar || '';
+  editDraft._photo = n.photo || '';
+  editDraft._mapEmbed = n.mapEmbed || '';
+  editDraft._videoEmbed = n.videoEmbed || '';
+  renderEditForm();
+  document.getElementById('editFormOverlay').style.display = 'flex';
+}
+
+function closeEditForm(){
+  document.getElementById('editFormOverlay').style.display = 'none';
+  editingNodeId = null;
+  editDraft = null;
+}
+
+function renderEditForm(){
+  const c = document.getElementById('editFormContent');
+  let html = '';
+  html += '<h2>Edit node</h2>';
+
+  html += '<label>Label (shown on the circle — use line breaks for multi-line)</label>'+
+    '<textarea id="ef_label">'+escapeHtml(editDraft._label)+'</textarea>';
+
+  html += '<label>Avatar (emoji, paste an image URL, or upload a photo below)</label>'+
+    '<input type="text" id="ef_avatar" value="'+escapeAttr(editDraft._avatar)+'" placeholder="\ud83d\udc64 or https://...jpg">'+
+    '<div style="display:flex;align-items:center;gap:10px;margin-top:8px;">'+
+      '<input type="file" id="ef_avatar_file" accept="image/*" style="flex:1;font-size:12px;">'+
+      '<div class="avatarPreview" id="ef_avatar_preview">'+(editDraft._avatar && !/^(https?:|data:image)/.test(editDraft._avatar) ? editDraft._avatar : '\ud83d\udc64')+'</div>'+
+    '</div>'+
+    '<div style="font-size:10.5px;color:#aaa;margin-top:4px;">Uploaded photos are stored in this browser only \u2014 not on any server.</div>';
+
+  html += '<label>Node photo (fills the whole circle \u2014 a person, a building, whatever)</label>'+
+    '<input type="text" id="ef_photo" value="'+escapeAttr(editDraft._photo)+'" placeholder="https://...jpg">'+
+    '<div style="display:flex;align-items:center;gap:10px;margin-top:8px;">'+
+      '<input type="file" id="ef_photo_file" accept="image/*" style="flex:1;font-size:12px;">'+
+      '<div class="avatarPreview" id="ef_photo_preview" style="border-radius:6px;overflow:hidden;">'+
+        (editDraft._photo ? '<img src="'+escapeAttr(editDraft._photo)+'" style="width:100%;height:100%;object-fit:cover;" onerror="this.remove()">' : '\ud83d\uddbc\ufe0f')+
+      '</div>'+
+    '</div>'+
+    '<div style="font-size:10.5px;color:#aaa;margin-top:4px;">Uploaded photos are stored in this browser only \u2014 not on any server. Clear the text field and save to remove it.</div>';
+
+  html += '<label>Or fill the node with a live map of a place (overrides the photo above)</label>'+
+    '<input type="text" id="ef_mapembed" value="'+escapeAttr(editDraft._mapEmbed||'')+'" placeholder="An address, or a place name like &quot;Gibraltar&quot;">'+
+    '<div style="font-size:10.5px;color:#aaa;margin-top:4px;">Renders an embedded Google Map filling the circle. Clear and save to remove it.</div>';
+
+  html += '<label>Or fill the node with a looping video (overrides the photo and map above)</label>'+
+    '<input type="text" id="ef_videoembed" value="'+escapeAttr(editDraft._videoEmbed||'')+'" placeholder="A YouTube link/id, or a direct video file URL (.mp4)">'+
+    '<div style="font-size:10.5px;color:#aaa;margin-top:4px;">Plays silently on loop, filling the circle. Clear and save to remove it.</div>';
+
+  {
+    const n = nodeMap[editingNodeId];
+    const liveEl = document.getElementById('node-'+editingNodeId);
+    const cs = liveEl ? getComputedStyle(liveEl) : null;
+    const curColor = n.textColor || (cs ? rgbToHex(cs.color) : '#ffffff');
+    const curSize = n.fontSize ? parseInt(n.fontSize) : (cs ? Math.round(parseFloat(cs.fontSize)) : 20);
+    const curLine = n.lineHeight ? Math.round(parseFloat(n.lineHeight)*100) : 124;
+    const curWeight = n.fontWeight ? parseInt(n.fontWeight) : 800;
+    html += '<label style="margin-top:18px;">Text style for this node (overrides the type default — applies immediately, no need to click Save)</label>'+
+      '<div class="cpSection" style="padding:14px;">'+
+        '<div class="cpColorRow"><label>color</label><input type="color" id="ef_textcolor" value="'+curColor+'"></div>'+
+        '<div class="sliderLine"><label>size</label><input type="range" id="ef_fontsize" min="10" max="40" value="'+curSize+'"><span class="val" id="ef_fontsize_val">'+curSize+'px</span></div>'+
+        '<div class="sliderLine"><label>line</label><input type="range" id="ef_lineheight" min="90" max="200" value="'+curLine+'"><span class="val" id="ef_lineheight_val">'+curLine+'%</span></div>'+
+        '<div class="sliderLine"><label>bold</label><input type="range" id="ef_fontweight" min="400" max="1000" step="50" value="'+curWeight+'"><span class="val" id="ef_fontweight_val">'+curWeight+'</span></div>'+
+        '<button type="button" class="addBtn" id="ef_textreset" style="margin-top:8px;">↺ Reset to type default</button>'+
+      '</div>';
+  }
+
+  html += '<label>Title (shown at top of detail panel)</label>'+
+    '<input type="text" id="ef_title" value="'+escapeAttr(editDraft.title||'')+'">';
+
+  html += '<label>Subtitle</label>'+
+    '<input type="text" id="ef_subtitle" value="'+escapeAttr(editDraft.subtitle||'')+'">';
+
+  html += '<label>Sections</label>';
+  editDraft.sections.forEach((sec, si)=>{
+    html += '<div class="sectionBlock" data-si="'+si+'">'+
+      '<button class="removeBtn" onclick="removeSection('+si+')">remove section</button>'+
+      '<input type="text" style="margin-bottom:8px;font-weight:600;" value="'+escapeAttr(sec.h)+'" data-field="h" data-si="'+si+'">';
+    sec.items.forEach((item, ii)=>{
+      html += '<div class="bulletRow" data-si="'+si+'" data-ii="'+ii+'">'+
+        '<textarea data-field="item" data-si="'+si+'" data-ii="'+ii+'">'+escapeHtml(item)+'</textarea>'+
+        '<button class="removeBtn" onclick="removeBullet('+si+','+ii+')">×</button>'+
+      '</div>';
+    });
+    html += '<button class="addBtn" onclick="addBullet('+si+')">+ add bullet</button>'+
+    '</div>';
+  });
+  html += '<button class="addBtn" onclick="addSection()">+ add section</button>';
+
+  html += '<label style="margin-top:18px;">Supporting documents &amp; links</label>';
+  editDraft.docs.forEach((doc, di)=>{
+    html += '<div class="docRow" data-di="'+di+'">'+
+      '<input type="text" placeholder="Label" value="'+escapeAttr(doc.label)+'" data-field="doclabel" data-di="'+di+'">'+
+      '<input type="text" placeholder="https://... (leave blank for placeholder)" value="'+escapeAttr(doc.url||'')+'" data-field="docurl" data-di="'+di+'">'+
+      '<button class="removeBtn" onclick="removeDoc('+di+')">×</button>'+
+    '</div>';
+  });
+  html += '<button class="addBtn" onclick="addDoc()">+ add document/link</button>';
+
+  html += '<div class="formButtons">'+
+    '<button class="saveBtn" onclick="saveEditForm()">Save changes</button>'+
+    '<button class="cancelBtn" onclick="closeEditForm()">Cancel</button>'+
+  '</div>';
+
+  c.innerHTML = html;
+  wireEditFormInputs();
+}
+
+function wireEditFormInputs(){
+  const c = document.getElementById('editFormContent');
+
+  // text style — applies immediately (like every other slider-based
+  // control across the wall), not staged behind the Save button below,
+  // since typing a label/section takes longer and shouldn't re-render on
+  // every keystroke the way a live color/size preview should
+  const n = nodeMap[editingNodeId];
+  const applyTextLive = ()=>{
+    const liveEl = document.getElementById('node-'+n.id);
+    if(liveEl) applyNodeTextStyle(liveEl, n);
+    persistNode(n);
+  };
+  const textColorInp = document.getElementById('ef_textcolor');
+  if(textColorInp) textColorInp.addEventListener('input', e=>{ n.textColor = e.target.value; applyTextLive(); });
+  const fontSizeInp = document.getElementById('ef_fontsize');
+  if(fontSizeInp) fontSizeInp.addEventListener('input', e=>{
+    n.fontSize = e.target.value+'px';
+    document.getElementById('ef_fontsize_val').textContent = e.target.value+'px';
+    applyTextLive();
+  });
+  const lineHeightInp = document.getElementById('ef_lineheight');
+  if(lineHeightInp) lineHeightInp.addEventListener('input', e=>{
+    n.lineHeight = (e.target.value/100).toFixed(2);
+    document.getElementById('ef_lineheight_val').textContent = e.target.value+'%';
+    applyTextLive();
+  });
+  const fontWeightInp = document.getElementById('ef_fontweight');
+  if(fontWeightInp) fontWeightInp.addEventListener('input', e=>{
+    n.fontWeight = e.target.value;
+    document.getElementById('ef_fontweight_val').textContent = e.target.value;
+    applyTextLive();
+  });
+  const textResetBtn = document.getElementById('ef_textreset');
+  if(textResetBtn) textResetBtn.addEventListener('click', ()=>{
+    n.textColor = null; n.fontSize = null; n.lineHeight = null; n.fontWeight = null;
+    applyTextLive();
+    renderEditForm();
+  });
+
+  c.querySelectorAll('input[data-field="h"]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const si = +e.target.dataset.si;
+      editDraft.sections[si].h = e.target.value;
+    });
+  });
+  c.querySelectorAll('textarea[data-field="item"]').forEach(ta=>{
+    ta.addEventListener('input', e=>{
+      const si = +e.target.dataset.si, ii = +e.target.dataset.ii;
+      editDraft.sections[si].items[ii] = e.target.value;
+    });
+  });
+  c.querySelectorAll('input[data-field="doclabel"]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const di = +e.target.dataset.di;
+      editDraft.docs[di].label = e.target.value;
+    });
+  });
+  c.querySelectorAll('input[data-field="docurl"]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const di = +e.target.dataset.di;
+      editDraft.docs[di].url = e.target.value.trim() || null;
+    });
+  });
+
+  const avatarUrlInput = document.getElementById('ef_avatar');
+  const avatarPreview = document.getElementById('ef_avatar_preview');
+  if(avatarUrlInput){
+    avatarUrlInput.addEventListener('input', e=>{
+      const val = e.target.value.trim();
+      updateAvatarPreview(avatarPreview, val);
+    });
+  }
+
+  const avatarFileInput = document.getElementById('ef_avatar_file');
+  if(avatarFileInput){
+    avatarFileInput.addEventListener('change', e=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      if(file.size > 2 * 1024 * 1024){
+        alert('That image is over 2MB. Please choose a smaller photo \u2014 large images can slow down the wall and fill up browser storage quickly.');
+        e.target.value = '';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        const dataUrl = reader.result;
+        avatarUrlInput.value = dataUrl;
+        updateAvatarPreview(avatarPreview, dataUrl);
+      };
+      reader.onerror = ()=>{
+        alert('Could not read that file. Please try a different image.');
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const photoUrlInput = document.getElementById('ef_photo');
+  const photoPreview = document.getElementById('ef_photo_preview');
+  function updatePhotoPreview(val){
+    photoPreview.innerHTML = val
+      ? '<img src="'+escapeAttr(val)+'" style="width:100%;height:100%;object-fit:cover;" onerror="this.remove()">'
+      : '\ud83d\uddbc\ufe0f';
+  }
+  if(photoUrlInput){
+    photoUrlInput.addEventListener('input', e=>updatePhotoPreview(e.target.value.trim()));
+  }
+  const photoFileInput = document.getElementById('ef_photo_file');
+  if(photoFileInput){
+    photoFileInput.addEventListener('change', e=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      if(file.size > 2 * 1024 * 1024){
+        alert('That image is over 2MB. Please choose a smaller photo \u2014 large images can slow down the wall and fill up browser storage quickly.');
+        e.target.value = '';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        const dataUrl = reader.result;
+        photoUrlInput.value = dataUrl;
+        updatePhotoPreview(dataUrl);
+      };
+      reader.onerror = ()=>{
+        alert('Could not read that file. Please try a different image.');
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+}
+
+function updateAvatarPreview(previewEl, val){
+  if(!val){ previewEl.textContent = '\ud83d\udc64'; return; }
+  if(/^(https?:|data:image)/.test(val)){
+    previewEl.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = val;
+    img.style.width = '100%'; img.style.height = '100%';
+    img.style.borderRadius = '50%'; img.style.objectFit = 'cover';
+    img.onerror = ()=>{ previewEl.textContent = '\ud83d\udc64'; };
+    previewEl.appendChild(img);
+  } else {
+    previewEl.textContent = val;
+  }
+}
+
+function addSection(){
+  editDraft.sections.push({h:'New section', items:['New bullet point']});
+  renderEditForm();
+}
+function removeSection(si){
+  editDraft.sections.splice(si,1);
+  renderEditForm();
+}
+function addBullet(si){
+  editDraft.sections[si].items.push('New bullet point');
+  renderEditForm();
+}
+function removeBullet(si, ii){
+  editDraft.sections[si].items.splice(ii,1);
+  renderEditForm();
+}
+function addDoc(){
+  editDraft.docs.push({label:'New document', url:null});
+  renderEditForm();
+}
+function removeDoc(di){
+  editDraft.docs.splice(di,1);
+  renderEditForm();
+}
+
+function saveEditForm(){
+  const n = nodeMap[editingNodeId];
+  if(!n) return;
+
+  editDraft._label = document.getElementById('ef_label').value;
+  editDraft._avatar = document.getElementById('ef_avatar').value.trim();
+  editDraft._photo = document.getElementById('ef_photo').value.trim();
+  editDraft._mapEmbed = document.getElementById('ef_mapembed').value.trim();
+  editDraft._videoEmbed = document.getElementById('ef_videoembed').value.trim();
+  editDraft.title = document.getElementById('ef_title').value;
+  editDraft.subtitle = document.getElementById('ef_subtitle').value;
+
+  n.label = editDraft._label;
+  n.avatar = editDraft._avatar || null;
+  n.photo = editDraft._photo || null;
+  n.mapEmbed = editDraft._mapEmbed || null;
+  n.videoEmbed = editDraft._videoEmbed || null;
+  // textColor/fontSize/lineHeight/fontWeight are NOT written from
+  // editDraft here — the sliders above apply them straight to `n` live,
+  // the moment they're touched (see wireEditFormInputs). Writing stale
+  // editDraft._textColor etc back here (captured once, at openEditForm
+  // time) would clobber whatever was actually just set.
+  n.detail.title = editDraft.title;
+  n.detail.subtitle = editDraft.subtitle;
+  n.detail.sections = editDraft.sections;
+  n.detail.docs = editDraft.docs;
+
+  const el = nodeElMap[n.id];
+  if(el){
+    el.innerHTML = '';
+    el.classList.remove('has-photo', 'has-map', 'has-video');
+    applyNodePhoto(el, n);
+    if(n.avatar){
+      const av = document.createElement('div');
+      av.className = 'avatar';
+      renderAvatarInto(av, n.avatar);
+      el.appendChild(av);
+    }
+    const span = document.createElement('span');
+    span.className = 'lbl';
+    span.innerHTML = escapeHtml(n.label).replace(/\n/g,'<br>') + '<span class="clickhint">click for details</span>';
+    el.appendChild(span);
+    applyResizeHandle(el);
+    applyNodeTextStyle(el, n);
+  }
+
+  persistNode(n);
+  closeEditForm();
+}
+
+window.addEventListener('keydown', e=>{
+  if(e.key === 'Escape'){
+    closeDetail();
+    closeEditForm();
+  }
+});
+
+// ============================================================
+// INIT
+// ============================================================
+applyOverridesToNodes();
+applyColorStyles();
+renderZones();
+renderClusters();
+renderNodes();
+renderEdges();
+applyTransform();
+setTimeout(fitAll, 50);
+
+</script>
+<script>
+/* server sync — pushes every save to the server (cookie-authed) so edits
+   survive browser clears and follow you across devices */
+(function(){
+  let t = null;
+  function queueSync(){
+    clearTimeout(t);
+    t = setTimeout(async () => {
+      try{
+        const state = {
+          overrides: JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'),
+          colors: JSON.parse(localStorage.getItem(COLOR_STORAGE_KEY) || 'null'),
+        };
+        const r = await fetch('/api/wall', {
+          method:'PUT',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({state}),
+        });
+        if(!r.ok) throw new Error(r.status);
+      }catch(e){ console.warn('server sync failed — edits saved in this browser only', e); }
+    }, 800);
+  }
+  const _saveOverrides = saveOverrides;
+  saveOverrides = function(o){ _saveOverrides(o); queueSync(); };
+  const _saveColors = saveColors;
+  saveColors = function(c){ _saveColors(c); queueSync(); };
+  resetAllEdits = async function(){
+    if(!confirm('This will erase every edit you have made (positions, text, docs, photos) on every device and restore the original wall. This cannot be undone. Continue?')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(COLOR_STORAGE_KEY);
+    try{
+      await fetch('/api/wall', {
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({state:{overrides:{}, colors:null}}),
+      });
+    }catch(e){}
+    location.reload();
+  };
+})();
+</script>
+<script>
+/* RSS / feed import + static export */
+(function(){
+  const $id = s => document.getElementById(s);
+  const controls = $id('editDrawer');
+  function mkBtn(label, fn){
+    const b = document.createElement('button');
+    b.textContent = label; b.onclick = fn;
+    controls.appendChild(b); return b;
+  }
+  mkBtn('RSS', openRss);
+  mkBtn('Export static', exportStatic);
+
+  function getOverrides(){
+    // use the engine's in-memory object so a later persistNode() save
+    // doesn't clobber keys written here
+    return (typeof overrides === 'object' && overrides) ? overrides : {};
+  }
+
+  // ---------- overlay ----------
+  let overlay = null;
+  function ovl(html){
+    closeOvl();
+    overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(20,18,14,0.45);z-index:500;display:flex;align-items:center;justify-content:center;';
+    overlay.addEventListener('click', e => { if(e.target === overlay) closeOvl(); });
+    overlay.innerHTML = '<div style="background:hsl(40,50%,98%);border-radius:12px;width:520px;max-width:94vw;max-height:86vh;overflow-y:auto;padding:24px 26px;font-size:13px;font-family:inherit;">' + html + '</div>';
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+  function closeOvl(){ if(overlay){ overlay.remove(); overlay = null; } }
+
+  // ---------- RSS import ----------
+  let rssItems = [];
+  function openRss(){
+    const feeds = getOverrides().__feeds || [];
+    ovl(
+      '<h2 style="font-size:17px;margin-bottom:4px;">Feed import</h2>'+
+      '<div style="opacity:.6;font-size:11px;margin-bottom:14px;">RSS, Atom or JSON Feed — fetched through the wall server</div>'+
+      '<div style="display:flex;gap:6px;margin-bottom:10px;">'+
+        '<input id="rssUrl" type="text" placeholder="https://…/feed.xml or feed.json" style="flex:1;padding:8px 10px;border:1px solid #c9bfa8;border-radius:6px;font-size:12.5px;">'+
+        '<button id="rssGo" style="padding:8px 14px;border:none;border-radius:6px;background:#2a5008;color:#fff;font-weight:600;cursor:pointer;">Fetch</button>'+
+      '</div>'+
+      feeds.map(u => '<button class="rssFeed" data-u="'+escapeHtml(u)+'" style="display:block;width:100%;text-align:left;border:1px solid #ddd;border-radius:6px;background:#fff;padding:6px 8px;margin-bottom:4px;font-size:10.5px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escapeHtml(u)+'</button>').join('')+
+      '<div id="rssList" style="margin-top:8px;"></div>'+
+      '<div id="rssActions" style="margin-top:14px;"></div>'
+    );
+    const go = () => { const u = $id('rssUrl').value.trim(); if(u) fetchFeed(u); };
+    $id('rssGo').onclick = go;
+    $id('rssUrl').addEventListener('keydown', e => { if(e.key === 'Enter') go(); });
+    overlay.querySelectorAll('.rssFeed').forEach(b =>
+      b.onclick = () => { $id('rssUrl').value = b.dataset.u; fetchFeed(b.dataset.u); });
+    $id('rssUrl').focus();
+  }
+  async function fetchFeed(url){
+    $id('rssList').innerHTML = '<div style="opacity:.6;">Fetching…</div>';
+    $id('rssActions').innerHTML = '';
+    try{
+      const r = await fetch('/api/rss?url=' + encodeURIComponent(url));
+      const j = await r.json();
+      if(!r.ok) throw new Error(j.error || r.status);
+      rssItems = j.items || [];
+      const o = getOverrides();
+      o.__feeds = [url].concat((o.__feeds || []).filter(u => u !== url)).slice(0,8);
+      saveOverrides(o); // patched — also syncs to the server
+      if(!rssItems.length){
+        $id('rssList').innerHTML = '<div style="opacity:.6;">No items found in that feed.</div>';
+        return;
+      }
+      $id('rssList').innerHTML =
+        (j.feedTitle ? '<div style="font-weight:700;font-size:11px;text-transform:uppercase;opacity:.6;margin-bottom:6px;">'+escapeHtml(j.feedTitle)+'</div>' : '')+
+        rssItems.map((it,i) =>
+          '<label style="display:flex;gap:8px;align-items:flex-start;padding:7px 2px;border-bottom:1px solid #eee;cursor:pointer;">'+
+          '<input type="checkbox" data-i="'+i+'" style="margin-top:3px;">'+
+          '<span><span style="display:block;">'+escapeHtml(it.title)+'</span>'+
+          (it.date ? '<span style="display:block;font-size:9.5px;opacity:.55;">'+escapeHtml(it.date)+'</span>' : '')+
+          '</span></label>').join('');
+      $id('rssActions').innerHTML = '<button id="rssAdd" style="padding:9px 16px;border:none;border-radius:6px;background:#2a5008;color:#fff;font-weight:600;cursor:pointer;">Add selected to the wall</button>';
+      $id('rssAdd').onclick = () => addRss(j.feedTitle || url);
+    }catch(e){
+      $id('rssList').innerHTML = '<div style="color:#a33;">Could not fetch: '+escapeHtml(e.message)+'</div>';
+    }
+  }
+  async function addRss(feedTitle){
+    const picked = [...document.querySelectorAll('#rssList input:checked')].map(c => rssItems[+c.dataset.i]);
+    if(!picked.length) return;
+    const vw = viewport.clientWidth, vh = viewport.clientHeight;
+    const cx = originX + vw/(2*scale), cy = originY + vh/(2*scale);
+    const o = getOverrides();
+    o.__added = o.__added || [];
+    picked.forEach((it,i) => {
+      o.__added.push({
+        id: 'rss' + Math.random().toString(36).slice(2,8),
+        x: Math.round(cx + (i%3)*280 - 280),
+        y: Math.round(cy + Math.floor(i/3)*260 - 130),
+        type: 'entity', tier: 3,
+        label: String(it.title || '(untitled)').slice(0,60),
+        detail: {
+          title: it.title || '(untitled)',
+          subtitle: (feedTitle ? feedTitle + ' · ' : '') + (it.date || ''),
+          tag: 'entity',
+          sections: it.summary ? [{h:'Summary', items:[it.summary]}] : [],
+          docs: it.link ? [{label:'Open article', url: it.link}] : [],
+        },
+      });
+    });
+    saveOverrides(o);
+    // push to the server explicitly, then reload so the engine renders them
+    try{
+      await fetch('/api/wall', {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({state:{overrides:o, colors: JSON.parse(localStorage.getItem(COLOR_STORAGE_KEY) || 'null')}}),
+      });
+    }catch(e){}
+    location.reload();
+  }
+
+  // ---------- static export ----------
+  function exportStatic(){
+    const J = x => JSON.stringify(x).replace(/</g, '\\u003c');
+    // bake each node's effective pixel size so the viewer needs no size logic
+    const nodes = NODES.map(n => Object.assign({}, n, {w: sizeFor(n.type, n.tier)}));
+    const o = (typeof overrides === 'object' && overrides) ? overrides : {};
+    const panelsOut = (o.__panels || []).filter(p => !p.hidden);
+    const showZones = !!o.__showZones;
+    let colorCss = '';
+    Object.keys(TYPE_LABELS).forEach(t => {
+      const c = currentColors[t]; if(!c) return;
+      colorCss += '.node.'+t+' { background:hsl('+c.fillH+','+c.fillS+'%,'+c.fillL+'%); '+
+        'border-color:hsl('+c.borderH+','+c.borderS+'%,'+c.borderL+'%); '+
+        'color:'+(c.textColor || '#222')+'; '+
+        'font-weight:'+(c.weight || 800)+'; '+
+        'line-height:'+((c.lineH || 124)/100)+'; '+
+        'border-width:'+(c.borderW ?? (t==='sticky'?4:9))+'px; '+
+        (t === 'sticky' ? 'border-radius:'+(c.radius ?? 10)+'px; ' : '')+
+        '}\n';
+    });
+    const today = new Date().toISOString().slice(0,10);
+    const html = [
+'<!DOCTYPE html>',
+'<html lang="en">',
+'<head>',
+'<meta charset="UTF-8">',
+'<title>Investigation wall — demo ('+today+')</title>',
+'<link rel="preconnect" href="https://fonts.googleapis.com">',
+'<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
+'<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,400..1000&display=swap" rel="stylesheet">',
+'<style>',
+'* { box-sizing: border-box; margin: 0; padding: 0; }',
+'html, body { width: 100%; height: 100%; overflow: hidden; font-family: \'Google Sans Flex\', -apple-system, BlinkMacSystemFont, sans-serif; }',
+'.viewport { width: 100vw; height: 100vh; position: relative; overflow: hidden; cursor: grab; }',
+'.viewport.panning { cursor: grabbing; }',
+'.world { position: absolute; top: 0; left: 0; transform-origin: 0 0; width: 5000px; height: 2550px; }',
+'svg.lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible; }',
+'.zone { position: absolute; border-radius: 32px; z-index: 0; }',
+'.zone .zone-label { position: absolute; top: 18px; left: 28px; font-size: 15px; font-weight: 700; }',
+'.zone .zone-sublabel { position: absolute; top: 40px; left: 28px; font-size: 10.5px; opacity: .75; }',
+'.cluster { position: absolute; border-radius: 20px; z-index: 0; pointer-events: none; border:1.5px dashed rgba(0,0,0,0.16); }',
+'.cluster .cluster-label { position: absolute; top: 8px; left: 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; opacity: .8; }',
+'.node { position: absolute; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; user-select: none; padding: 11px; word-break: break-word; border-radius: 50%; box-shadow: 0 3px 10px rgba(0,0,0,0.18); border-width: 9px; border-style: solid; }',
+'.node.sticky { border-radius:10px; cursor:default; width:200px; height:auto; min-height:64px; padding:14px 17px; border-width:4px; }',
+'.avatar { width: 40px; height: 40px; border-radius: 50%; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.55); border: 2px solid rgba(0,0,0,0.15); font-size: 20px; }',
+'.avatar img { width:100%; height:100%; border-radius:50%; object-fit:cover; }',
+colorCss,
+'line.web-line { stroke:#ccc; stroke-width:1.2px; }',
+'line.web-line.strong { stroke:#999; stroke-width:2.2px; }',
+'line.web-line.confirm { stroke:#3b6d11; stroke-width:1.8px; }',
+'line.web-line.warn { stroke:#854f0b; stroke-width:1.2px; stroke-dasharray:5 3; }',
+'line.web-line.danger { stroke:#e06060; stroke-width:1.2px; stroke-dasharray:5 3; }',
+'line.web-line.keyfind { stroke:#7ab44a; stroke-width:3px; }',
+'line.web-line.fbi { stroke:#4488ff; stroke-width:1.8px; }',
+'line.web-line.bomb { stroke:#ff4444; stroke-width:1.8px; stroke-dasharray:6 2; }',
+'line.web-line.replacement { stroke:#ff9933; stroke-width:2px; stroke-dasharray:2 2; }',
+'#controls { position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:300; display:flex; gap:6px; align-items:center; border:1px solid #ddd; border-radius:10px; padding:7px 10px; box-shadow:0 2px 10px rgba(0,0,0,0.12); background:hsla(42,38%,97%,0.97); }',
+'#controls button { font-size:11px; padding:5px 11px; border:1px solid #ccc; border-radius:6px; background:#fff; cursor:pointer; }',
+'#zoomLabel { font-size:11px; color:#888; min-width:42px; text-align:center; }',
+'#legend { position:fixed; bottom:14px; left:14px; z-index:300; border:1px solid #ddd; padding:10px 14px; font-size:10px; line-height:1.9; max-height:50vh; overflow-y:auto; background:hsla(42,38%,97%,0.97); border-radius:8px; }',
+'#detailOverlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(20,18,14,0.45); z-index:400; display:none; align-items:center; justify-content:flex-end; }',
+'#detailPanel { width:440px; max-width:94vw; height:100%; box-shadow:-6px 0 24px rgba(0,0,0,0.25); padding:28px 26px; overflow-y:auto; font-size:13.5px; line-height:1.6; position:relative; background:hsla(40,50%,98%,1); }',
+'#detailPanel .closeBtn { position:absolute; top:20px; right:20px; background:none; border:none; font-size:22px; color:#999; cursor:pointer; }',
+'#detailPanel h2 { font-size:18px; line-height:1.3; }',
+'#detailPanel .subtitle { font-size:11.5px; opacity:.7; margin-bottom:16px; text-transform:uppercase; }',
+'#detailPanel section { margin-bottom:18px; }',
+'#detailPanel section h3 { font-size:11.5px; text-transform:uppercase; opacity:.6; margin-bottom:6px; }',
+'#detailPanel ul { padding-left:18px; margin-top:4px; }',
+'#detailPanel li { margin-bottom:5px; }',
+'#detailPanel .docItem { display:flex; gap:8px; padding:8px 10px; margin-bottom:6px; border-radius:8px; background:rgba(0,0,0,0.04); font-size:12.5px; }',
+'#detailPanel .docItem a { color:#1a5a8a; }',
+'</style>',
+'</head>',
+'<body>',
+'<div class="viewport" id="viewport"><div class="world" id="world"><svg class="lines" id="lines"></svg></div></div>',
+'<div id="controls">',
+'  <button onclick="zoomBy(1.2)">+ Zoom in</button>',
+'  <span id="zoomLabel">100%</span>',
+'  <button onclick="zoomBy(0.83)">− Zoom out</button>',
+'  <button onclick="resetView()">Reset view</button>',
+'  <button onclick="fitAll()">Fit all</button>',
+'</div>',
+'<div id="legend">',
+'  <div style="font-style:italic;opacity:.7;">Click any circle for full details</div>',
+'  <div style="font-style:italic;opacity:.6;margin-top:4px;">Drag to pan · Scroll to zoom</div>',
+'</div>',
+'<div id="detailOverlay" onclick="if(event.target===this)closeDetail()">',
+'  <div id="detailPanel"><button class="closeBtn" onclick="closeDetail()">&times;</button><div id="detailContent"></div></div>',
+'</div>',
+'<script>',
+'const NODES = ' + J(nodes) + ';',
+'const EDGES = ' + J(EDGES) + ';',
+'const ZONES = ' + J(showZones ? ZONES : []) + ';',
+'const CLUSTERS = ' + J(showZones && typeof CLUSTERS !== 'undefined' ? CLUSTERS : []) + ';',
+'const PANELS = ' + J(panelsOut) + ';',
+'const viewport = document.getElementById(\'viewport\');',
+'const world = document.getElementById(\'world\');',
+'const svg = document.getElementById(\'lines\');',
+'let scale = 0.5, originX = 0, originY = 0, panning=false, panStartX=0, panStartY=0, originStartX=0, originStartY=0;',
+'function applyTransform(){ world.style.transform = \'translate(\'+(-originX*scale)+\'px,\'+(-originY*scale)+\'px) scale(\'+scale+\')\'; document.getElementById(\'zoomLabel\').textContent = Math.round(scale*100)+\'%\'; }',
+'function zoomBy(f,cx,cy){ const vw=viewport.clientWidth, vh=viewport.clientHeight; if(cx===undefined)cx=vw/2; if(cy===undefined)cy=vh/2; const wx=originX+cx/scale, wy=originY+cy/scale; scale=Math.min(2.2,Math.max(0.15,scale*f)); originX=wx-cx/scale; originY=wy-cy/scale; applyTransform(); }',
+'function resetView(){ scale=0.5; originX=0; originY=0; applyTransform(); }',
+'function fitAll(){',
+'  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;',
+'  NODES.forEach(n=>{ minX=Math.min(minX,n.x-150); maxX=Math.max(maxX,n.x+150); minY=Math.min(minY,n.y-150); maxY=Math.max(maxY,n.y+150); });',
+'  ZONES.forEach(z=>{ minX=Math.min(minX,z.x-20); maxX=Math.max(maxX,z.x+z.w+20); minY=Math.min(minY,z.y-20); maxY=Math.max(maxY,z.y+z.h+20); });',
+'  const vw=viewport.clientWidth, vh=viewport.clientHeight, ww=maxX-minX, wh=maxY-minY;',
+'  scale=Math.max(Math.min(vw/ww, vh/wh, 1.3), 0.12);',
+'  originX = minX - (vw/scale-ww)/2; originY = minY - (vh/scale-wh)/2;',
+'  applyTransform();',
+'}',
+'viewport.addEventListener(\'mousedown\', e=>{ panning=true; panStartX=e.clientX; panStartY=e.clientY; originStartX=originX; originStartY=originY; });',
+'window.addEventListener(\'mousemove\', e=>{ if(!panning)return; originX=originStartX-(e.clientX-panStartX)/scale; originY=originStartY-(e.clientY-panStartY)/scale; applyTransform(); });',
+'window.addEventListener(\'mouseup\', ()=>{ panning=false; });',
+'viewport.addEventListener(\'wheel\', e=>{ e.preventDefault(); const r=viewport.getBoundingClientRect(); zoomBy(e.deltaY<0?1.1:0.91, e.clientX-r.left, e.clientY-r.top); }, {passive:false});',
+'function escapeHtml(s){ const d=document.createElement(\'div\'); d.textContent=s; return d.innerHTML; }',
+'const psvg = document.createElementNS(\'http://www.w3.org/2000/svg\',\'svg\');',
+'psvg.setAttribute(\'width\',\'5000\'); psvg.setAttribute(\'height\',\'2550\');',
+'psvg.style.cssText = \'position:absolute;top:0;left:0;overflow:visible;pointer-events:none;\';',
+'world.insertBefore(psvg, world.firstChild);',
+'const hslaP = c => \'hsla(\'+c.h+\',\'+c.s+\'%,\'+c.l+\'%,\'+((c.a==null?100:c.a)/100)+\')\';',
+'function pathFrom(pts){ if(pts.length<3) return \'\'; let d=\'M \'+pts[0][0]+\' \'+pts[0][1]; for(let i=1;i<pts.length-1;i++){ d+=\' Q \'+pts[i][0]+\' \'+pts[i][1]+\' \'+((pts[i][0]+pts[i+1][0])/2)+\' \'+((pts[i][1]+pts[i+1][1])/2); } const L=pts[pts.length-1]; d+=\' Q \'+L[0]+\' \'+L[1]+\' \'+pts[0][0]+\' \'+pts[0][1]+\' Z\'; return d; }',
+'PANELS.forEach(p=>{ const el=document.createElementNS(\'http://www.w3.org/2000/svg\',\'path\'); el.setAttribute(\'d\', pathFrom(p.points)); el.setAttribute(\'fill\', hslaP(p.fill)); if(p.outline){ el.setAttribute(\'stroke\', hslaP(Object.assign({},p.fill,{a:100}))); el.setAttribute(\'stroke-width\',\'2.5\'); } psvg.appendChild(el); if(p.label){ let cx=0,cy=0; p.points.forEach(q=>{cx+=q[0];cy+=q[1];}); cx/=p.points.length; cy/=p.points.length; const t=document.createElementNS(\'http://www.w3.org/2000/svg\',\'text\'); t.setAttribute(\'x\',cx); t.setAttribute(\'y\',cy); t.setAttribute(\'text-anchor\',\'middle\'); t.setAttribute(\'style\',\'font-size:15px;font-weight:700;opacity:.65;\'); t.textContent=p.label; psvg.appendChild(t); } });',
+'const nodeMap = {};',
+'ZONES.forEach(z=>{ const el=document.createElement(\'div\'); el.className=\'zone\'; el.style.left=z.x+\'px\'; el.style.top=z.y+\'px\'; el.style.width=z.w+\'px\'; el.style.height=z.h+\'px\'; el.style.background=\'rgba(255,255,255,0.04)\'; el.style.border=\'1.5px dashed rgba(0,0,0,0.18)\'; const l=document.createElement(\'div\'); l.className=\'zone-label\'; l.textContent=z.label; el.appendChild(l); const s2=document.createElement(\'div\'); s2.className=\'zone-sublabel\'; s2.textContent=z.sublabel||\'\'; el.appendChild(s2); world.insertBefore(el, svg); });',
+'CLUSTERS.forEach(c=>{ const el=document.createElement(\'div\'); el.className=\'cluster\'; el.style.left=c.x+\'px\'; el.style.top=c.y+\'px\'; el.style.width=c.w+\'px\'; el.style.height=c.h+\'px\'; const l=document.createElement(\'div\'); l.className=\'cluster-label\'; l.textContent=c.label||\'\'; el.appendChild(l); world.insertBefore(el, svg); });',
+'NODES.forEach(n=>{',
+'  const el=document.createElement(\'div\'); el.className=\'node \'+n.type;',
+'  const w=n.w||160; el.style.left=(n.x-w/2)+\'px\'; el.style.top=(n.y-w/2)+\'px\'; el.style.width=w+\'px\'; if(n.type!==\'sticky\') el.style.height=w+\'px\';',
+'  if(n.avatar){ const av=document.createElement(\'div\'); av.className=\'avatar\'; if(/^(https?:|data:image)/.test(n.avatar)){ const img=document.createElement(\'img\'); img.src=n.avatar; av.appendChild(img); } else { av.textContent=n.avatar; } el.appendChild(av); }',
+'  const span=document.createElement(\'span\'); span.innerHTML=escapeHtml(n.label).replace(/\\n/g,\'<br>\'); el.appendChild(span);',
+'  if(n.detail){ el.addEventListener(\'click\', ()=>openDetail(n)); }',
+'  world.appendChild(el); nodeMap[n.id]=n;',
+'});',
+'EDGES.forEach(([f,t,type])=>{ const a=nodeMap[f], b=nodeMap[t]; if(!a||!b) return; const line=document.createElementNS(\'http://www.w3.org/2000/svg\',\'line\'); line.setAttribute(\'x1\',a.x); line.setAttribute(\'y1\',a.y); line.setAttribute(\'x2\',b.x); line.setAttribute(\'y2\',b.y); line.setAttribute(\'class\',\'web-line\'+(type&&type!==\'normal\'?\' \'+type:\'\')); svg.appendChild(line); });',
+'function openDetail(n){',
+'  const d=n.detail; let html=\'<h2>\'+escapeHtml(d.title)+\'</h2>\';',
+'  if(d.subtitle) html+=\'<div class="subtitle">\'+escapeHtml(d.subtitle)+\'</div>\';',
+'  if(d.video) html+=\'<div style="position:relative;width:100%;aspect-ratio:16/9;margin:12px 0 14px;border-radius:10px;overflow:hidden;background:#000;"><iframe src="https://www.youtube-nocookie.com/embed/\'+encodeURIComponent(d.video)+\'" style="position:absolute;inset:0;width:100%;height:100%;border:0;" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>\';',
+'  (d.sections||[]).forEach(sec=>{ html+=\'<section><h3>\'+escapeHtml(sec.h)+\'</h3><ul>\'; (sec.items||[]).forEach(i=>html+=\'<li>\'+escapeHtml(i)+\'</li>\'); html+=\'</ul></section>\'; });',
+'  if(d.docs && d.docs.length){ html+=\'<section><h3>Supporting documents &amp; links</h3>\'; d.docs.forEach(doc=>{ html += doc.url ? \'<div class="docItem"><a href="\'+doc.url+\'" target="_blank" rel="noopener">\'+escapeHtml(doc.label)+\'</a></div>\' : \'<div class="docItem" style="opacity:.5;">\'+escapeHtml(doc.label)+\'</div>\'; }); html+=\'</section>\'; }',
+'  document.getElementById(\'detailContent\').innerHTML = html;',
+'  document.getElementById(\'detailOverlay\').style.display = \'flex\';',
+'}',
+'function closeDetail(){ document.getElementById(\'detailOverlay\').style.display = \'none\'; }',
+'applyTransform();',
+'setTimeout(fitAll, 50);',
+'<\/script>',
+'</body>',
+'</html>',
+    ].join('\n');
+    const blob = new Blob([html], {type:'text/html'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'wall_demo_static_' + today + '.html';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+})();
+</script>
+<script>
+/* background panels (freehand lasso), photoshop-style layers,
+   and quick node add / delete */
+(function(){
+  const $id = s => document.getElementById(s);
+  const controls = $id('editDrawer');
+  function btn(label, fn){
+    const b = document.createElement('button');
+    b.textContent = label; b.onclick = fn;
+    controls.appendChild(b); return b;
+  }
+  function ov(){ return (typeof overrides === 'object' && overrides) ? overrides : {}; }
+  function save(){ saveOverrides(ov()); } // patched — also syncs to the server
+
+  /* ---------- panels layer (SVG behind everything) ---------- */
+  const panelsSvg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  panelsSvg.setAttribute('width','5000');
+  panelsSvg.setAttribute('height','2550');
+  panelsSvg.style.cssText = 'position:absolute;top:0;left:0;overflow:visible;pointer-events:none;';
+  world.insertBefore(panelsSvg, world.firstChild);
+
+  function panels(){
+    const o = ov();
+    if(!Array.isArray(o.__panels)) o.__panels = [];
+    return o.__panels;
+  }
+  const hslaC = c => 'hsla('+c.h+','+c.s+'%,'+c.l+'%,'+((c.a==null?100:c.a)/100)+')';
+  function centroid(pts){
+    let x=0, y=0;
+    pts.forEach(p => { x += p[0]; y += p[1]; });
+    return [x/pts.length, y/pts.length];
+  }
+  function pathFrom(pts){ // smooth closed path through the lasso points
+    if(pts.length < 3) return '';
+    let d = 'M '+pts[0][0]+' '+pts[0][1];
+    for(let i=1; i<pts.length-1; i++){
+      d += ' Q '+pts[i][0]+' '+pts[i][1]+' '+((pts[i][0]+pts[i+1][0])/2)+' '+((pts[i][1]+pts[i+1][1])/2);
+    }
+    const L = pts[pts.length-1];
+    d += ' Q '+L[0]+' '+L[1]+' '+pts[0][0]+' '+pts[0][1]+' Z';
+    return d;
+  }
+  function renderPanels(){
+    panelsSvg.innerHTML = '';
+    for(const p of panels()){
+      if(p.hidden) continue;
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('d', pathFrom(p.points));
+      path.setAttribute('fill', hslaC(p.fill));
+      if(p.outline){
+        path.setAttribute('stroke', hslaC(Object.assign({}, p.fill, {a:100})));
+        path.setAttribute('stroke-width','2.5');
+      }
+      panelsSvg.appendChild(path);
+      if(p.label){
+        const [cx,cy] = centroid(p.points);
+        const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+        t.setAttribute('x', cx); t.setAttribute('y', cy);
+        t.setAttribute('text-anchor','middle');
+        t.setAttribute('style','font-size:15px;font-weight:700;opacity:.65;');
+        t.textContent = p.label;
+        panelsSvg.appendChild(t);
+      }
+    }
+  }
+
+  /* ---------- lasso drawing ---------- */
+  let drawing = null;      // {pts, replaceId}
+  let previewPath = null;
+  let lassoDown = false;
+  function worldXY(e){
+    const r = viewport.getBoundingClientRect();
+    return [Math.round(originX + (e.clientX - r.left)/scale),
+            Math.round(originY + (e.clientY - r.top)/scale)];
+  }
+  function startDraw(replaceId){
+    drawing = { pts:[], replaceId: replaceId || null };
+    lassoDown = false;
+    viewport.style.cursor = 'crosshair';
+    const hint = $id('hint');
+    if(hint) hint.textContent = 'Draw a loose lasso around the area — release to finish · Esc cancels';
+    previewPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+    previewPath.setAttribute('style','fill:hsla(45,60%,70%,0.25);stroke:#b08d4a;stroke-width:2;stroke-dasharray:6 4;');
+    panelsSvg.appendChild(previewPath);
+  }
+  function endDraw(commit){
+    if(!drawing) return;
+    const { pts, replaceId } = drawing;
+    drawing = null; lassoDown = false;
+    viewport.style.cursor = '';
+    const hint = $id('hint');
+    if(hint) hint.textContent = 'Drag or scroll to pan · Pinch/Ctrl+scroll to zoom · Click a node for details';
+    if(previewPath){ previewPath.remove(); previewPath = null; }
+    if(!commit || pts.length < 3){ renderPanels(); return; }
+    const step = Math.max(1, Math.ceil(pts.length / 90)); // keep the shape loose but light
+    const slim = pts.filter((_, i) => i % step === 0);
+    let p;
+    if(replaceId){
+      p = panels().find(x => x.id === replaceId);
+      if(p) p.points = slim;
+    } else {
+      p = { id:'p'+Math.random().toString(36).slice(2,8),
+            points: slim, fill:{h:45,s:55,l:72,a:30},
+            label:'', outline:false, hidden:false };
+      panels().push(p);
+    }
+    save(); renderPanels();
+    if(p) openColorPanel({tab:'shapes', shapeId: p.id});
+  }
+  viewport.addEventListener('mousedown', e => {
+    if(!drawing) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    lassoDown = true;
+    drawing.pts.push(worldXY(e));
+  }, true);
+  window.addEventListener('mousemove', e => {
+    if(!drawing || !lassoDown) return;
+    e.stopImmediatePropagation();
+    const p = worldXY(e), last = drawing.pts[drawing.pts.length-1];
+    if(!last || Math.hypot(p[0]-last[0], p[1]-last[1]) > 8/scale){
+      drawing.pts.push(p);
+      if(previewPath && drawing.pts.length > 2) previewPath.setAttribute('d', pathFrom(drawing.pts));
+    }
+  }, true);
+  window.addEventListener('mouseup', e => {
+    if(!drawing || !lassoDown) return;
+    e.stopImmediatePropagation();
+    endDraw(true);
+  }, true);
+  window.addEventListener('keydown', e => { if(e.key === 'Escape' && drawing) endDraw(false); });
+
+  /* ---------- zone visibility (styling for panels/shapes now lives in the
+     unified 🎨 Style panel's Shapes tab — see renderShapesTab/wireColorPanel) ---------- */
+  function applyZoneVis(){
+    const show = !!ov().__showZones;
+    document.querySelectorAll('.zone, .cluster').forEach(el => el.style.display = show ? '' : 'none');
+  }
+
+  /* ---------- quick node add / delete ---------- */
+  function renderSingleNode(n){
+    const el = document.createElement('div');
+    el.className = 'node ' + n.type;
+    el.id = 'node-' + n.id;
+    positionNodeEl(el, n);
+    applyNodePhoto(el, n);
+    if(n.avatar){
+      const av = document.createElement('div');
+      av.className = 'avatar';
+      renderAvatarInto(av, n.avatar);
+      el.appendChild(av);
+    }
+    const span = document.createElement('span');
+    span.className = 'lbl';
+    span.innerHTML = escapeHtml(n.label).replace(/\n/g,'<br>') + (n.detail ? '<span class="clickhint">click for details</span>' : '');
+    el.appendChild(span);
+    applyResizeHandle(el);
+    applyNodeTextStyle(el, n);
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      if(editMode){ openEditForm(n); }
+      else if(n.detail){ openDetail(n); }
+    });
+    attachDrag(el, n);
+    attachResize(el, n);
+    world.appendChild(el);
+    nodeMap[n.id] = n;
+    nodeElMap[n.id] = el;
+  }
+  function addNode(){
+    const vw = viewport.clientWidth, vh = viewport.clientHeight;
+    const n = {
+      id:'u'+Math.random().toString(36).slice(2,8),
+      x: Math.round(originX + vw/(2*scale)),
+      y: Math.round(originY + vh/(2*scale)),
+      type:'entity', tier:2, label:'New node',
+      detail:{ title:'New node', subtitle:'', tag:'entity', sections:[], docs:[] },
+    };
+    const o = ov();
+    o.__added = o.__added || [];
+    o.__added.push(n);
+    NODES.push(n);
+    renderSingleNode(n);
+    save();
+    if(!editMode) toggleEditMode();
+    openEditForm(n);
+  }
+  function deleteNode(n){
+    const o = ov();
+    const added = o.__added || [];
+    const ai = added.findIndex(x => x.id === n.id);
+    if(ai >= 0) added.splice(ai, 1);                 // was added here — just drop it
+    else {                                            // baked node — remember the removal
+      o.__removed = o.__removed || [];
+      if(!o.__removed.includes(n.id)) o.__removed.push(n.id);
+    }
+    delete o[n.id];
+    const ni = NODES.indexOf(n); if(ni >= 0) NODES.splice(ni, 1);
+    if(nodeElMap[n.id]){ nodeElMap[n.id].remove(); delete nodeElMap[n.id]; }
+    delete nodeMap[n.id];
+    for(let i = EDGES.length-1; i >= 0; i--)
+      if(EDGES[i][0] === n.id || EDGES[i][1] === n.id) EDGES.splice(i, 1);
+    svg.querySelectorAll('line[data-from="'+n.id+'"], line[data-to="'+n.id+'"]').forEach(l => l.remove());
+    save();
+  }
+  // give the engine's edit form a Delete button
+  const _openEditForm = openEditForm;
+  openEditForm = function(n){
+    _openEditForm(n);
+    const btns = document.querySelector('#editForm .formButtons');
+    if(btns && !btns.querySelector('.nodeDeleteBtn')){
+      const d = document.createElement('button');
+      d.className = 'deleteBtn nodeDeleteBtn';
+      d.textContent = '🗑 Delete';
+      btns.appendChild(d);
+    }
+    const d = document.querySelector('#editForm .nodeDeleteBtn');
+    if(d) d.onclick = e => {
+      e.preventDefault();
+      if(!confirm('Delete this node and its connections? (Original nodes come back with "Reset all edits".)')) return;
+      deleteNode(n);
+      closeEditForm();
+    };
+  };
+
+  /* ---------- toolbar + boot ---------- */
+  btn('➕ Node', addNode);
+  btn('⬠ Panel', () => startDraw());
+  applyZoneVis();
+  renderPanels();
+
+  // expose to the unified 🎨 Style panel (defined in the main engine script,
+  // which runs before this closure exists — see renderShapesTab/renderNodeTab
+  // and wireColorPanel in the earlier <script>)
+  window.wallAddNode = addNode;
+  window.wallDeleteNode = deleteNode;
+  window.wallPanels = panels;
+  window.wallSavePanels = save;
+  window.wallRenderPanels = renderPanels;
+  window.wallStartDraw = startDraw;
+  window.wallHslaC = hslaC;
+  window.wallApplyZoneVis = applyZoneVis;
+  window.wallOv = ov;
+})();
+</script>
+<script>
+/* films section — populated live from a channel's feed, categorized,
+   sortable, playable as in-place embeds.
+   CUSTOMIZE PER WALL: edit FILMS_CONFIG below. Leave channelId empty
+   ('') to disable the section (shows a "not configured" message). */
+(function(){
+  const FILMS_CONFIG = {
+    channelId: '', // YouTube channel id — '' disables this section
+    cacheKey: 'wall_demo_films_cache1', // v3: bumped again — v2 landed just before pinned-favorites did, so anyone who loaded in that narrow window cached a valid (non-empty) result missing the pinned video, and it would've sat there for up to an hour under the empty-cache guard
+    pageSize: 3, // how many cards show at once per category — "Show more" reveals another batch
+    // videos to always show even after they've aged out of the plain
+    // feed's ~15-most-recent window (YouTube gives no way to page further
+    // back without a paid-quota API key) — add a video id here any time a
+    // favorite disappears. Fetched via /api/yt-oembed, so title/thumbnail
+    // still work; date/views aren't available that way, so pinned cards
+    // sort to the end under "Newest"/"Most viewed" but always show under "All".
+    pinned: ['GNm90azYl6g'], // "The Chihuahua Effect — BAM Franchising Financial Analysis"
+    // Only 4 categories, in this order: Most Recent Videos (the catch-all
+    // default), Livestream, Shorts, Posts. YouTube's plain video RSS feed
+    // (what /api/rss reads — no API key) has no field marking a video as a
+    // short or a past livestream, so those two are best-effort TITLE regex
+    // matches, not a real classification. "Posts" (YouTube Community posts)
+    // aren't in this feed at all — that requires the paid-quota YouTube
+    // Data API, which this zero-API-key setup deliberately doesn't use — so
+    // that category always renders empty with a link to the channel's
+    // Community tab instead of pretending to have content.
+    categories: [
+      ['Livestream', /\blive\b|livestream|🔴/i],
+      ['Shorts',     /#shorts|\bshorts?\b/i],
+    ],
+  };
+  const CATEGORY_ORDER = ['Most Recent Videos', 'Livestream', 'Shorts', 'Posts'];
+
+  const grid = document.getElementById('filmsGrid');
+  const ctrl = document.getElementById('filmsControls');
+  if(!FILMS_CONFIG.channelId){
+    ctrl.innerHTML = '';
+    grid.innerHTML = '<div style="opacity:.6;">Videos section not configured — set FILMS_CONFIG.channelId in wall.html to enable it.</div>';
+    return;
+  }
+
+  const FILMS_FEED = 'https://www.youtube.com/feeds/videos.xml?channel_id=' + FILMS_CONFIG.channelId;
+  const catFor = t => { for(const [c,re] of FILMS_CONFIG.categories) if(re.test(t)) return c; return 'Most Recent Videos'; };
+  const fmtViews = v => v == null ? '' : new Intl.NumberFormat().format(v) + ' views';
+  const fmtDate = d => (d || '').slice(0, 10);
+
+  let films = null, sortBy = 'views', activeCat = 'All', playing = null, shown = FILMS_CONFIG.pageSize;
+
+  async function loadFeed(force){
+    if(!force){
+      try{
+        const c = JSON.parse(localStorage.getItem(FILMS_CONFIG.cacheKey) || 'null');
+        // an empty cached result doesn't count as valid — re-fetch instead of
+        // being stuck showing nothing for up to an hour if a fetch ever came
+        // back empty (network hiccup, feed briefly unavailable, etc.)
+        if(c && c.items && c.items.length && Date.now() - c.at < 3600e3){ films = c.items; return; }
+      }catch(e){}
+    }
+    const r = await fetch('/api/rss?url=' + encodeURIComponent(FILMS_FEED));
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error || r.status);
+    const feedItems = (j.items || []).filter(v => v.videoId);
+    const haveIds = new Set(feedItems.map(v => v.videoId));
+    const pinnedIds = (FILMS_CONFIG.pinned || []).filter(id => !haveIds.has(id));
+    const pinnedItems = (await Promise.all(pinnedIds.map(async id => {
+      try{
+        const pr = await fetch('/api/yt-oembed?id=' + encodeURIComponent(id));
+        const pj = await pr.json();
+        return pr.ok ? Object.assign(pj, {_pinned: true}) : null;
+      }catch(e){ return null; }
+    }))).filter(Boolean);
+    // mark any already-in-the-feed pinned videos too, so they float to the
+    // top instead of sitting wherever the sort happens to land them
+    feedItems.forEach(v => { if((FILMS_CONFIG.pinned||[]).includes(v.videoId)) v._pinned = true; });
+    films = [...feedItems, ...pinnedItems];
+    try{ localStorage.setItem(FILMS_CONFIG.cacheKey, JSON.stringify({at: Date.now(), items: films})); }catch(e){}
+  }
+
+  function sorted(){
+    let list = films.slice();
+    if(activeCat !== 'All') list = list.filter(v => catFor(v.title) === activeCat);
+    const by = {
+      new:  (a,b) => (b.date||'').localeCompare(a.date||''),
+      old:  (a,b) => (a.date||'').localeCompare(b.date||''),
+      views:(a,b) => (b.views||0) - (a.views||0),
+      az:   (a,b) => a.title.localeCompare(b.title),
+    }[sortBy];
+    // pinned favorites float to the top regardless of sort — they often
+    // have no date/views (fetched via oEmbed once they've aged out of the
+    // feed), so they'd otherwise sort to the very end and need several
+    // "Show more" clicks to ever see
+    return list.sort((a, b) => (!!b._pinned - !!a._pinned) || by(a, b));
+  }
+
+  function render(){
+    const cats = ['All', ...CATEGORY_ORDER];
+    ctrl.innerHTML = cats.map(c =>
+      '<button data-cat="'+escapeHtml(c)+'" style="font-size:11px;padding:5px 11px;border-radius:14px;cursor:pointer;border:1px solid '+(c===activeCat?'#2a5008':'#ccc')+';background:'+(c===activeCat?'#2a5008':'#fff')+';color:'+(c===activeCat?'#fff':'#444')+';">'+escapeHtml(c)+'</button>').join(' ')+
+      '<select id="fl-sort" style="margin-left:auto;font-size:11.5px;padding:5px 8px;border:1px solid #ccc;border-radius:6px;background:#fff;">'+
+        '<option value="new"'+(sortBy==='new'?' selected':'')+'>Newest first</option>'+
+        '<option value="old"'+(sortBy==='old'?' selected':'')+'>Oldest first</option>'+
+        '<option value="views"'+(sortBy==='views'?' selected':'')+'>Most viewed</option>'+
+        '<option value="az"'+(sortBy==='az'?' selected':'')+'>Title A–Z</option>'+
+      '</select>'+
+      '<button id="fl-refresh" title="Refetch the feed" style="font-size:11px;padding:5px 10px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;">↻</button>';
+
+    if(activeCat === 'Posts'){
+      grid.innerHTML = '<div style="opacity:.7;grid-column:1/-1;">'+
+        'YouTube Community posts aren\'t in the video feed this section reads (no API key used here), so they can\'t be shown inline — '+
+        '<a href="https://www.youtube.com/channel/'+encodeURIComponent(FILMS_CONFIG.channelId)+'/community" target="_blank" rel="noopener" style="color:#1a5a8a;">view them on the channel\'s Community tab ↗</a>.'+
+        '</div>';
+      ctrl.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { activeCat = b.dataset.cat; playing = null; shown = FILMS_CONFIG.pageSize; render(); });
+      ctrl.querySelector('#fl-sort').onchange = e => { sortBy = e.target.value; playing = null; shown = FILMS_CONFIG.pageSize; render(); };
+      ctrl.querySelector('#fl-refresh').onclick = async () => {
+        grid.innerHTML = '<div style="opacity:.5;">Refetching…</div>';
+        try{ await loadFeed(true); render(); }
+        catch(e){ grid.innerHTML = '<div style="color:#a33;">Could not load the feed: '+escapeHtml(e.message)+'</div>'; }
+      };
+      return;
+    }
+
+    const list = sorted();
+    const page = list.slice(0, shown);
+    grid.innerHTML = page.map(v => {
+      const cat = catFor(v.title);
+      const isPlaying = playing === v.videoId;
+      const media = isPlaying
+        ? '<div style="position:relative;width:100%;aspect-ratio:16/9;background:#000;"><iframe src="https://www.youtube-nocookie.com/embed/'+encodeURIComponent(v.videoId)+'?autoplay=1" style="position:absolute;inset:0;width:100%;height:100%;border:0;" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe></div>'
+        : '<div data-play="'+escapeHtml(v.videoId)+'" style="position:relative;width:100%;aspect-ratio:16/9;background:#000 url('+(v.thumb ? escapeHtml(v.thumb) : '')+') center/cover;cursor:pointer;">'+
+          '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div style="width:46px;height:46px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;padding-left:4px;">▶</div></div></div>';
+      return '<div style="border:1px solid #e8e3d4;border-radius:10px;overflow:hidden;background:#fff;">'+
+        media+
+        '<div style="padding:9px 11px;">'+
+          '<div style="font-weight:600;font-size:12.5px;line-height:1.35;">'+escapeHtml(v.title)+'</div>'+
+          '<div style="font-size:10.5px;color:#888;margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'+
+            '<span>'+fmtDate(v.date)+'</span>'+(v.views != null ? '<span>'+fmtViews(v.views)+'</span>' : '')+
+            '<span class="regionChip">'+escapeHtml(cat)+'</span>'+
+            '<a href="'+escapeHtml(v.link || ('https://www.youtube.com/watch?v='+v.videoId))+'" target="_blank" rel="noopener" style="color:#1a5a8a;margin-left:auto;">YouTube ↗</a>'+
+          '</div>'+
+        '</div></div>';
+    }).join('') || '<div style="opacity:.5;">Nothing in this category.</div>';
+    if(list.length > shown){
+      grid.innerHTML += '<button id="fl-more" style="grid-column:1/-1;font-size:12px;padding:9px;border:1px dashed #999;border-radius:8px;background:#fff;cursor:pointer;color:#555;">Show '+Math.min(FILMS_CONFIG.pageSize, list.length - shown)+' more</button>';
+    }
+    ctrl.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { activeCat = b.dataset.cat; playing = null; shown = FILMS_CONFIG.pageSize; render(); });
+    grid.querySelectorAll('[data-play]').forEach(b => b.onclick = () => { playing = b.dataset.play; render(); });
+    const moreBtn = document.getElementById('fl-more');
+    if(moreBtn) moreBtn.onclick = () => { shown += FILMS_CONFIG.pageSize; render(); };
+    ctrl.querySelector('#fl-sort').onchange = e => { sortBy = e.target.value; playing = null; shown = FILMS_CONFIG.pageSize; render(); };
+    ctrl.querySelector('#fl-refresh').onclick = async () => {
+      grid.innerHTML = '<div style="opacity:.5;">Refetching…</div>';
+      try{ await loadFeed(true); shown = FILMS_CONFIG.pageSize; render(); }
+      catch(e){ grid.innerHTML = '<div style="color:#a33;">Could not load the feed: '+escapeHtml(e.message)+'</div>'; }
+    };
+  }
+
+  loadFeed().then(render).catch(e => {
+    grid.innerHTML = '<div style="color:#a33;">Could not load the channel feed: '+escapeHtml(e.message)+'</div>';
+  });
+})();
+</script>
+<script>
+/* World Watch + Onion desk — feed-driven story nodes on maps, with a
+   hover lightbox. Also: section nav wiring, legend hiding off-wall.
+   CUSTOMIZE PER WALL: edit NEWS_CONFIG below. Set watch.enabled or
+   onion.enabled to false to leave a section showing a "not configured"
+   message instead of fetching (that's the template default). */
+(function(){
+  const NEWS_CONFIG = {
+    watch: {
+      enabled: false,
+      cacheKey: 'wall_demo_watch_cache1', // v6: widened to 15 years (was 7 — the Andy Oblad case is from 2017, outside the old window), tightened the last query to "government official misconduct" (was "official corruption investigation", which let some non-government political noise through)
+      // Utah-only topic — every query must mention Utah, but the OUTLET can
+      // be anywhere (an international paper covering a Utah story is
+      // exactly what this section wants to surface). yearsBack is applied
+      // at fetch time as a rolling "after:" date, computed from today —
+      // never hardcode an absolute date here, it'll silently go stale.
+      yearsBack: 15,
+      queries: [
+        'Mary Celeste',
+        'maritime mystery derelict ship',
+      ],
+      // this wall documents police/judicial ABUSE of power, not police doing
+      // their job — routine "police successfully prosecuted a civilian"
+      // coverage (someone else pleading guilty, getting sentenced, etc.)
+      // gets excluded, UNLESS the officer/judge themselves is who's being
+      // held accountable, which is exactly the kind of story this wants
+      excludeFilter: /pleads? guilty|guilty plea|sentenced to (prison|jail|\d+ years?)|convicted of|found guilty|faces (up to )?\d+ years?|indicted on \d+ counts?/i,
+      excludeException: /officer|deputy|police chief|sheriff|judge|prosecutor|district attorney|\bda\b/i,
+      localRegionName: 'Utah', localRegionLL: [39.32, -111.09],
+      extraFeeds: [
+        { url: 'https://www.aljazeera.com/xml/rss/all.xml', filter: /utah/i, src: 'Al Jazeera' },
+      ],
+      mapCenter: [39.5, -111.7], mapZoom: 6,
+    },
+    onion: {
+      enabled: false,
+      cacheKey: 'wall_demo_onion_cache1',
+      // Utah geography only, deliberately — short queries (see the watch
+      // config comment above for why: Google News silently ignores complex
+      // parenthetical-OR queries and falls back to generic results).
+      archiveQueries: [
+        'theonion.com ship', 'theonion.com "lost at sea"',
+      ],
+      freshFeedUrl: 'https://theonion.com/feed/',
+      freshFilter: /gibraltar|azores|genoa/i,
+      bbox: { minLon: -114.1, maxLon: -109, minLat: 36.9, maxLat: 42.1 }, // roughly Utah
+      fallbackRegionName: 'Utah', fallbackRegionLL: [39.32, -111.09],
+      mapCenter: [39.5, -111.7], mapZoom: 7,
+    },
+  };
+
+  /* ---------- top nav: text links, hamburger, edit drawer, wall chrome ---------- */
+  const navLinks = [...document.querySelectorAll('.navlink')];
+  navLinks.forEach(a => {
+    a.onclick = () => {
+      const el = document.getElementById(a.dataset.go);
+      if(el) el.scrollIntoView({behavior:'smooth'});
+      document.getElementById('navLinks').classList.remove('open');
+    };
+  });
+  const hamburgerBtn = document.getElementById('hamburgerBtn');
+  if(hamburgerBtn) hamburgerBtn.onclick = () => document.getElementById('navLinks').classList.toggle('open');
+
+  const editToggleBtn = document.getElementById('editToggleBtn');
+  const editDrawer = document.getElementById('editDrawer');
+  if(editToggleBtn) editToggleBtn.onclick = () => {
+    const open = editDrawer.hasAttribute('hidden');
+    if(open) editDrawer.removeAttribute('hidden'); else editDrawer.setAttribute('hidden','');
+    editToggleBtn.classList.toggle('active', open);
+  };
+
+  const legendToggleBtn = document.getElementById('legendToggleBtn');
+  const legendEl = document.getElementById('legend');
+  let legendOpen = false;
+  if(legendToggleBtn && legendEl) legendToggleBtn.onclick = () => {
+    legendOpen = !legendOpen;
+    if(legendOpen) legendEl.removeAttribute('hidden'); else legendEl.setAttribute('hidden','');
+    legendToggleBtn.classList.toggle('active', legendOpen);
+  };
+
+  const wallChrome = ['hint'].map(id => document.getElementById(id)).filter(Boolean);
+  const sections = ['viewport','mapSection','filmsSection','watchSection','onionSection'].map(id => document.getElementById(id)).filter(Boolean);
+  const vp = document.getElementById('viewport');
+  if('IntersectionObserver' in window && vp){
+    new IntersectionObserver(es => {
+      const on = es[0].isIntersecting;
+      wallChrome.forEach(el => el.style.display = on ? '' : 'none');
+      // the legend key only makes sense while looking at the wall itself —
+      // hide it off-wall regardless of toggle state, but respect the
+      // toggle (don't force it back open) when scrolling back to the wall
+      if(legendEl){
+        if(on && legendOpen) legendEl.removeAttribute('hidden');
+        else legendEl.setAttribute('hidden','');
+      }
+    }, {threshold: 0.15}).observe(vp);
+  }
+  if('IntersectionObserver' in window && sections.length){
+    const obs = new IntersectionObserver(es => {
+      es.forEach(e => {
+        if(!e.isIntersecting) return;
+        navLinks.forEach(a => a.classList.toggle('active', a.dataset.go === e.target.id));
+      });
+    }, {threshold: 0.5});
+    sections.forEach(s => obs.observe(s));
+  }
+
+  /* ---------- tiny gazetteer: name → [lat, lon] ---------- */
+  const GEO = {
+    // utah cities first — most specific wins
+    'salt lake city':[40.76,-111.89],'west valley city':[40.69,-111.99],
+    'layton':[41.06,-111.97],'farmington':[40.98,-111.89],'provo':[40.23,-111.66],'orem':[40.30,-111.69],
+    'ogden':[41.22,-111.97],'bountiful':[40.89,-111.88],'woods cross':[40.87,-111.90],'sandy':[40.56,-111.86],
+    'draper':[40.52,-111.86],'lehi':[40.39,-111.85],'american fork':[40.38,-111.80],'spanish fork':[40.11,-111.65],
+    'springville':[40.17,-111.61],'st. george':[37.10,-113.58],'st george':[37.10,-113.58],'cedar city':[37.68,-113.06],
+    'logan':[41.74,-111.83],'moab':[38.57,-109.55],'tooele':[40.53,-112.30],'murray':[40.67,-111.89],
+    'millcreek':[40.69,-111.87],'taylorsville':[40.66,-111.94],'south jordan':[40.56,-111.93],
+    'west jordan':[40.61,-112.00],'herriman':[40.51,-112.03],'riverton':[40.52,-111.94],'clearfield':[41.11,-112.03],
+    'roy':[41.16,-112.03],'syracuse':[41.09,-112.06],'kearns':[40.66,-112.01],'magna':[40.71,-112.10],
+    'midvale':[40.61,-111.90],'holladay':[40.67,-111.82],'park city':[40.65,-111.50],'heber':[40.51,-111.41],
+    'vernal':[40.46,-109.53],'price':[39.60,-110.81],'richfield':[38.77,-112.08],'nephi':[39.71,-111.84],
+    'brigham city':[41.51,-112.02],'kanab':[37.05,-112.53],'keizer':[45.00,-123.02],'salem':[44.94,-123.04],
+    'utah':[39.32,-111.09],'salt lake county':[40.67,-111.92],'davis county':[41.03,-112.00],'utah county':[40.12,-111.67],
+    // us cities
+    'new york':[40.71,-74.01],'los angeles':[34.05,-118.24],'chicago':[41.88,-87.63],'houston':[29.76,-95.37],
+    'phoenix':[33.45,-112.07],'philadelphia':[39.95,-75.17],'san antonio':[29.42,-98.49],'dallas':[32.78,-96.80],
+    'buckeye':[33.37,-112.58],'minneapolis':[44.98,-93.27],'memphis':[35.15,-90.05],'atlanta':[33.75,-84.39],
+    'denver':[39.74,-104.99],'seattle':[47.61,-122.33],'portland':[45.52,-122.68],'san francisco':[37.77,-122.42],
+    'oakland':[37.80,-122.27],'detroit':[42.33,-83.05],'baltimore':[39.29,-76.61],'new orleans':[29.95,-90.07],
+    'boston':[42.36,-71.06],'miami':[25.76,-80.19],'cleveland':[41.50,-81.69],'kansas city':[39.10,-94.58],
+    'st. louis':[38.63,-90.20],'las vegas':[36.17,-115.14],'albuquerque':[35.08,-106.65],'tucson':[32.22,-110.97],
+    'sacramento':[38.58,-121.49],'louisville':[38.25,-85.76],'milwaukee':[43.04,-87.91],'columbus':[39.96,-83.00],
+    'charlotte':[35.23,-80.84],'indianapolis':[39.77,-86.16],'ferguson':[38.74,-90.31],'washington':[38.91,-77.04],
+    // us states
+    'alabama':[32.8,-86.8],'alaska':[64.0,-152.0],'arizona':[34.2,-111.6],'arkansas':[34.8,-92.4],
+    'california':[37.2,-119.3],'colorado':[39.0,-105.5],'connecticut':[41.6,-72.7],'delaware':[39.0,-75.5],
+    'florida':[28.6,-82.4],'georgia':[32.6,-83.4],'hawaii':[20.8,-156.3],'idaho':[44.4,-114.6],
+    'illinois':[40.0,-89.2],'indiana':[39.9,-86.3],'iowa':[42.0,-93.5],'kansas':[38.5,-98.4],
+    'kentucky':[37.5,-85.3],'louisiana':[31.0,-92.0],'maine':[45.4,-69.2],'maryland':[39.0,-76.8],
+    'massachusetts':[42.3,-71.8],'michigan':[44.3,-85.4],'minnesota':[46.3,-94.3],'mississippi':[32.7,-89.7],
+    'missouri':[38.4,-92.5],'montana':[47.0,-109.6],'nebraska':[41.5,-99.8],'nevada':[39.3,-116.6],
+    'new hampshire':[43.7,-71.6],'new jersey':[40.2,-74.7],'new mexico':[34.4,-106.1],
+    'north carolina':[35.6,-79.4],'north dakota':[47.4,-100.5],'ohio':[40.3,-82.8],'oklahoma':[35.6,-97.5],
+    'oregon':[43.9,-120.6],'pennsylvania':[40.9,-77.8],'rhode island':[41.7,-71.6],'south carolina':[33.9,-80.9],
+    'south dakota':[44.4,-100.2],'tennessee':[35.8,-86.3],'texas':[31.5,-99.3],'vermont':[44.1,-72.7],
+    'virginia':[37.5,-78.9],'west virginia':[38.6,-80.6],'wisconsin':[44.6,-89.7],'wyoming':[43.0,-107.6],
+    // world
+    'canada':[56,-106],'toronto':[43.65,-79.38],'vancouver':[49.28,-123.12],'mexico':[23.6,-102.5],
+    'brazil':[-10,-52],'rio de janeiro':[-22.91,-43.17],'argentina':[-34,-64],'colombia':[4.6,-74.1],
+    'peru':[-9.2,-75],'chile':[-33.4,-70.7],'venezuela':[6.4,-66.6],'haiti':[18.97,-72.29],'cuba':[21.5,-77.8],
+    'jamaica':[18.11,-77.30],'guatemala':[15.8,-90.2],'honduras':[14.8,-86.6],'el salvador':[13.8,-88.9],
+    'nicaragua':[12.9,-85.2],'ecuador':[-1.8,-78.2],'bolivia':[-16.3,-63.6],'paraguay':[-23.4,-58.4],
+    'uruguay':[-32.5,-55.8],'dominican republic':[18.7,-70.2],
+    'united kingdom':[54,-2],'britain':[54,-2],'england':[52.5,-1.5],'london':[51.51,-0.13],'scotland':[56.5,-4.2],
+    'ireland':[53.4,-8.2],'france':[46.6,2.2],'paris':[48.86,2.35],'germany':[51.2,10.4],'berlin':[52.52,13.40],
+    'spain':[40.4,-3.7],'italy':[42.8,12.8],'portugal':[39.5,-8],'netherlands':[52.2,5.3],'belgium':[50.8,4.4],
+    'switzerland':[46.8,8.2],'austria':[47.6,14.1],'sweden':[62,15],'norway':[61,9],'denmark':[56,10],
+    'finland':[63,26],'poland':[52,19],'ukraine':[49,32],'russia':[60,90],'moscow':[55.76,37.62],
+    'belarus':[53.7,28],'greece':[39,22],'turkey':[39,35],'serbia':[44,21],'croatia':[45.1,15.2],
+    'hungary':[47.2,19.5],'romania':[45.9,25],'bulgaria':[42.7,25.5],'czech':[49.8,15.5],'slovakia':[48.7,19.7],
+    'iceland':[65,-19],'israel':[31.4,35],'jerusalem':[31.77,35.21],'tel aviv':[32.08,34.78],
+    'palestine':[31.9,35.2],'gaza':[31.5,34.47],'west bank':[31.95,35.3],'lebanon':[33.9,35.9],'syria':[35,38],
+    'iraq':[33,44],'iran':[32,53],'saudi arabia':[24,45],'yemen':[15.55,48.5],'jordan':[30.6,36.2],
+    'kuwait':[29.3,47.5],'qatar':[25.3,51.2],'dubai':[25.20,55.27],'united arab emirates':[23.4,53.8],
+    'oman':[21,57],'afghanistan':[33.9,67.7],'egypt':[26.8,30],'libya':[27,17],'tunisia':[34,9],
+    'algeria':[28,3],'morocco':[32,-6],'nigeria':[9.1,8.7],'ghana':[7.9,-1],'kenya':[0.02,37.9],
+    'ethiopia':[9.1,40.5],'somalia':[5.2,46.2],'sudan':[15.6,32.5],'south africa':[-29,25],
+    'zimbabwe':[-19,29.8],'congo':[-2.9,23.7],'uganda':[1.4,32.3],'tanzania':[-6.4,34.9],
+    'india':[21,78],'delhi':[28.61,77.21],'mumbai':[19.08,72.88],'pakistan':[30,69],'bangladesh':[23.7,90.4],
+    'sri lanka':[7.9,80.8],'nepal':[28.4,84.1],'china':[35,103],'beijing':[39.90,116.40],
+    'hong kong':[22.32,114.17],'taiwan':[23.7,121],'japan':[36.2,138.3],'tokyo':[35.68,139.69],
+    'south korea':[36.5,127.9],'seoul':[37.57,126.98],'north korea':[40.3,127.5],'philippines':[12.9,121.8],
+    'manila':[14.60,120.98],'indonesia':[-2.5,118],'malaysia':[4.2,102],'singapore':[1.35,103.82],
+    'thailand':[15.9,101],'vietnam':[14.1,108.3],'myanmar':[21.9,95.9],'cambodia':[12.6,105],
+    'kazakhstan':[48,68],'mongolia':[46.9,103.8],'australia':[-25,134],'sydney':[-33.87,151.21],
+    'melbourne':[-37.81,144.96],'new zealand':[-41.8,172.8],
+  };
+  const GEO_KEYS = Object.keys(GEO).sort((a,b) => b.length - a.length);
+  function locate(text){
+    const t = ' ' + (text || '').toLowerCase() + ' ';
+    for(const k of GEO_KEYS){
+      const i = t.indexOf(k);
+      if(i >= 0 && !/[a-z]/.test(t[i-1] || ' ') && !/[a-z]/.test(t[i+k.length] || ' '))
+        return { name: k, ll: GEO[k] };
+    }
+    return null;
+  }
+  // spiral outward instead of a tight grid, so many stories at one city don't tile into a block
+  const jitter = (ll, i) => {
+    if(i === 0) return ll;
+    const r = 0.22 * Math.sqrt(i), a = i * 2.4;
+    return [ll[0] + r * Math.cos(a), ll[1] + r * Math.sin(a) * 1.3];
+  };
+  // deterministic distinct hue per story, so overlapping/nearby markers read apart at a glance
+  function hueFor(str){
+    let h = 0;
+    for(let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    return h % 360;
+  }
+
+  /* ---------- lightbox ---------- */
+  const light = document.getElementById('storyLight');
+  let lightPinned = false, hideTimer = null;
+  light.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+  light.addEventListener('mouseleave', () => { if(!lightPinned) hideLight(); });
+  function hideLight(){ lightPinned = false; light.style.display = 'none'; }
+  function showLight(story, x, y, pin){
+    lightPinned = !!pin;
+    clearTimeout(hideTimer);
+    const bigImg = story.img ? story.img.replace(/([?&])w=\d+/, '$1w=800') : '';
+    light.innerHTML =
+      (bigImg ? '<img src="'+escapeHtml(bigImg)+'" alt="" onerror="this.remove()">' : '')+
+      '<button class="sl-x">✕</button>'+
+      '<div class="sl-body">'+
+        '<div class="sl-t"><a href="'+escapeHtml(story.link || '#')+'" target="_blank" rel="noopener">'+escapeHtml(story.title)+'</a></div>'+
+        '<div class="sl-m">'+
+          (story.src ? '<span>'+escapeHtml(story.src)+'</span>' : '')+
+          (story.date ? '<span>'+escapeHtml(String(story.date).slice(0, 16))+'</span>' : '')+
+          (story.region ? '<span class="regionChip">'+escapeHtml(story.region)+'</span>' : '')+
+        '</div>'+
+        (story.summary ? '<div class="sl-s">'+escapeHtml(story.summary.slice(0, 240))+'</div>' : '')+
+        '<div style="margin-top:8px;font-size:11px;"><a href="'+escapeHtml(story.link || '#')+'" target="_blank" rel="noopener" style="color:#1a5a8a;">Read the story ↗</a></div>'+
+      '</div>';
+    light.querySelector('.sl-x').onclick = hideLight;
+    light.style.display = 'block';
+    const w = 340, h = light.offsetHeight || 260;
+    light.style.left = Math.max(8, Math.min(innerWidth - w - 8, x + 16)) + 'px';
+    light.style.top = Math.max(8, Math.min(innerHeight - h - 8, y - h / 2)) + 'px';
+  }
+  function scheduleHide(){ if(!lightPinned) hideTimer = setTimeout(hideLight, 350); }
+
+  /* ---------- shared feed loading ---------- */
+  async function feed(url){
+    const r = await fetch('/api/rss?url=' + encodeURIComponent(url));
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.error || r.status);
+    return j.items || [];
+  }
+  const gnews = q => 'https://news.google.com/rss/search?q=' + encodeURIComponent(q) + '&hl=en-US&gl=US&ceid=US:en';
+  const dedupe = list => {
+    const seen = new Set();
+    return list.filter(s => {
+      const k = s.title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 70);
+      if(seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+  };
+  const cleanTitle = t => t.replace(/\s+-\s+[^-]{2,40}$/, ''); // strip " - Source" suffix
+  // most-recent-first; stories with an unparseable/missing date sink to the bottom rather than the top
+  const sortByDateDesc = list => list.sort((a, b) => {
+    const ta = Date.parse(a.date || ''), tb = Date.parse(b.date || '');
+    if(isNaN(ta) && isNaN(tb)) return 0;
+    if(isNaN(ta)) return 1;
+    if(isNaN(tb)) return -1;
+    return tb - ta;
+  });
+
+  function stripCards(el, stories){
+    el.innerHTML = stories.map((s, i) =>
+      '<div class="storyCard" data-i="'+i+'">'+
+        '<div class="sc-t">'+escapeHtml(cleanTitle(s.title))+'</div>'+
+        '<div class="sc-m">'+
+          (s.src ? '<span>'+escapeHtml(s.src)+'</span>' : '')+
+          (s.date ? '<span>'+escapeHtml(String(s.date).slice(0, 16))+'</span>' : '')+
+          '<span class="regionChip">'+escapeHtml(s.region || 'unplaced')+'</span>'+
+        '</div>'+
+      '</div>').join('');
+    el.querySelectorAll('.storyCard').forEach(c => {
+      const s = stories[+c.dataset.i];
+      c.onclick = e => {
+        if(s._marker && s._map){ s._map.setView(s._marker.getLatLng(), Math.max(s._map.getZoom(), 5)); }
+        showLight(s, e.clientX, e.clientY, true);
+      };
+    });
+  }
+
+  function addMarkers(map, stories, nodeCls){
+    const used = {};
+    for(const s of stories){
+      if(!s.ll) continue;
+      const key = s.ll.join(',');
+      const n = used[key] = (used[key] || 0) + 1;
+      const ll = n > 1 ? jitter(s.ll, n) : s.ll;
+      const h = hueFor(s.title + '|' + (s.link || ''));
+      const style = nodeCls === 'onion'
+        ? `background:hsl(${h},55%,90%);border-color:hsl(${h},55%,38%);`
+        : `background:hsl(${h},68%,92%);border-color:hsl(${h},68%,42%);`;
+      const icon = L.divIcon({ className: '', html: '<div class="newsNode '+(nodeCls||'')+'" style="'+style+'"></div>', iconSize: [20, 20], iconAnchor: [10, 10] });
+      const m = L.marker(ll, {icon}).addTo(map);
+      s._marker = m; s._map = map;
+      m.on('mouseover', e => showLight(s, e.originalEvent.clientX, e.originalEvent.clientY, false));
+      m.on('mouseout', scheduleHide);
+      m.on('click', e => showLight(s, e.originalEvent.clientX, e.originalEvent.clientY, true));
+    }
+  }
+
+  function baseMap(id, center, zoom){
+    const map = L.map(id, {worldCopyJump: true}).setView(center, zoom);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+    return map;
+  }
+  function notConfigured(mapElId, stripElId, sectionLabel){
+    document.getElementById(mapElId).innerHTML =
+      '<div style="padding:30px;color:#888;">'+escapeHtml(sectionLabel)+' is not configured for this wall — set NEWS_CONFIG in wall.html to enable it.</div>';
+    document.getElementById(stripElId).innerHTML = '';
+  }
+
+  /* ---------- world watch ---------- */
+  async function initWatch(){
+    const cfg = NEWS_CONFIG.watch;
+    const el = document.getElementById('watchMap');
+    if(typeof L === 'undefined'){ el.innerHTML = '<div style="padding:30px;color:#a33;">Map library did not load (offline?) — reload to retry.</div>'; return; }
+    const map = baseMap('watchMap', cfg.mapCenter, cfg.mapZoom);
+    let stories = [];
+    try{
+      const c = JSON.parse(localStorage.getItem(cfg.cacheKey) || 'null');
+      if(c && Date.now() - c.at < 3600e3) stories = c.items;
+    }catch(e){}
+    if(!stories.length){
+      // rolling window: computed from today, never a baked-in date that goes stale
+      let dateFilter = '';
+      if(cfg.yearsBack){
+        const d = new Date(); d.setFullYear(d.getFullYear() - cfg.yearsBack);
+        dateFilter = ' after:' + d.toISOString().slice(0, 10);
+      }
+      const [queryLists, ...extras] = await Promise.all([
+        Promise.all(cfg.queries.map(q => feed(gnews(q + dateFilter)).catch(() => []))),
+        ...(cfg.extraFeeds || []).map(f => feed(f.url).catch(() => [])),
+      ]);
+      const local = queryLists.flat();
+      local.forEach(s => s._local = true); // every query is Utah-only — everything defaults to Utah if ungeocoded
+      const extraFiltered = [];
+      (cfg.extraFeeds || []).forEach((f, i) => {
+        const hits = (extras[i] || []).filter(s => !f.filter || f.filter.test(s.title + ' ' + (s.summary || '')));
+        hits.forEach(s => { s.src = s.src || f.src; s._local = true; });
+        extraFiltered.push(...hits);
+      });
+      stories = dedupe([...local, ...extraFiltered]);
+      if(cfg.excludeFilter){
+        stories = stories.filter(s => {
+          const text = s.title + ' ' + (s.summary || '');
+          return !(cfg.excludeFilter.test(text) && !(cfg.excludeException && cfg.excludeException.test(text)));
+        });
+      }
+      try{ localStorage.setItem(cfg.cacheKey, JSON.stringify({at: Date.now(), items: stories})); }catch(e){}
+    }
+    for(const s of stories){
+      const hit = locate(cleanTitle(s.title) + ' ' + (s.summary || ''));
+      if(hit){ s.ll = hit.ll; s.region = hit.name.replace(/\b\w/g, c => c.toUpperCase()); }
+      else if(s._local){ s.ll = cfg.localRegionLL; s.region = cfg.localRegionName; }
+    }
+    sortByDateDesc(stories);
+    addMarkers(map, stories);
+    stripCards(document.getElementById('watchStrip'), stories);
+  }
+
+  /* ---------- the onion desk ---------- */
+  async function initOnion(){
+    const cfg = NEWS_CONFIG.onion;
+    const el = document.getElementById('onionMap');
+    if(typeof L === 'undefined'){ el.innerHTML = '<div style="padding:30px;color:#a33;">Map library did not load (offline?) — reload to retry.</div>'; return; }
+    const map = baseMap('onionMap', cfg.mapCenter, cfg.mapZoom);
+    let stories = [];
+    try{
+      const c = JSON.parse(localStorage.getItem(cfg.cacheKey) || 'null');
+      if(c && c.items && c.items.length && Date.now() - c.at < 3600e3) stories = c.items;
+    }catch(e){}
+    if(!stories.length){
+      const [archiveLists, fresh] = await Promise.all([
+        Promise.all(cfg.archiveQueries.map(q => feed(gnews(q)).catch(() => []))),
+        feed(cfg.freshFeedUrl).catch(() => []),
+      ]);
+      const archive = archiveLists.flat();
+      const matches = s => cfg.freshFilter.test(s.title + ' ' + (s.summary || ''));
+      stories = dedupe([...fresh.filter(matches), ...archive.filter(matches)])
+        .filter(s => !/^Home - The Onion/i.test(s.title));
+      stories.forEach(s => { s.src = 'The Onion'; });
+      try{ localStorage.setItem(cfg.cacheKey, JSON.stringify({at: Date.now(), items: stories})); }catch(e){}
+    }
+    stories.forEach((s, i) => {
+      const hit = locate(cleanTitle(s.title) + ' ' + (s.summary || ''));
+      const b = cfg.bbox;
+      if(hit && hit.ll[1] > b.minLon && hit.ll[1] < b.maxLon && hit.ll[0] > b.minLat && hit.ll[0] < b.maxLat){
+        s.ll = hit.ll; s.region = hit.name.replace(/\b\w/g, c => c.toUpperCase());
+      } else {
+        s.ll = jitter(cfg.fallbackRegionLL, i); s.region = cfg.fallbackRegionName;
+      }
+    });
+    sortByDateDesc(stories);
+    addMarkers(map, stories, 'onion');
+    stripCards(document.getElementById('onionStrip'), stories);
+    if(!stories.length) document.getElementById('onionStrip').innerHTML =
+      '<div style="opacity:.5;font-size:12px;">No matching stories in the feeds right now.</div>';
+  }
+
+  if(!NEWS_CONFIG.watch.enabled) notConfigured('watchMap', 'watchStrip', 'World Watch');
+  if(!NEWS_CONFIG.onion.enabled) notConfigured('onionMap', 'onionStrip', 'The Onion desk');
+
+  /* init each enabled map when its section first becomes visible */
+  let watchDone = !NEWS_CONFIG.watch.enabled, onionDone = !NEWS_CONFIG.onion.enabled;
+  function maybeInit(){
+    const near = id => {
+      const r = document.getElementById(id).getBoundingClientRect();
+      return r.top < innerHeight * 1.5;
+    };
+    if(!watchDone && near('watchSection')){ watchDone = true; initWatch().catch(e => console.warn('watch init', e)); }
+    if(!onionDone && near('onionSection')){ onionDone = true; initOnion().catch(e => console.warn('onion init', e)); }
+    if(watchDone && onionDone) removeEventListener('scroll', maybeInit);
+  }
+  addEventListener('scroll', maybeInit, {passive: true});
+  maybeInit();
+})();
+</script>
+<script>
+/* Map & Locations — a real embedded map (Leaflet + OpenStreetMap, same
+   free no-key tiles as World Watch) plus a genuine "Open in Google Maps"
+   link for Street View. Google quietly killed the old no-key
+   "maps.google.com/…&output=embed" trick (it now 404s), so this section
+   geocodes each place name via the server's /api/geocode proxy
+   (OpenStreetMap's free Nominatim) and drops a Leaflet marker there;
+   Street View isn't embeddable without a billed Google API key, so
+   instead we link out to Google's own site, where it works natively.
+   Clicking anywhere on the embedded map also drops a custom pin there
+   and repoints the Street View link at that exact spot — the closest
+   equivalent to Google's own "drag Pegman" gesture achievable without a
+   paid Maps JS API key. */
+(function(){
+  const LOCATIONS = [
+    { id:'ny',   label:'Departure — New York', query:'New York Harbor, New York, NY' },
+    { id:'last', label:'Last log entry — Azores', query:'Santa Maria Island, Azores, Portugal' },
+    { id:'gib',  label:'Salvage hearing — Gibraltar', query:'Gibraltar' },
+    { id:'gen',  label:'Intended destination — Genoa', query:'Genoa, Italy' },
+    { id:'built',label:'Built 1861 — Spencer\u2019s Island', query:'Spencers Island, Nova Scotia, Canada' },
+    { id:'end',  label:'Wrecked 1885 — Rochelois Bank', query:'Rochelois Bank, Haiti' },
+  ];
+  const frameEl = document.getElementById('mapFrame');
+  const picker = document.getElementById('mapPicker');
+  let map = null, marker = null, dropPin = null;
+  const geoCache = {};
+  const dropIcon = L.divIcon({
+    className: '', iconSize: [18, 18], iconAnchor: [9, 18],
+    html: '<div style="width:16px;height:16px;border-radius:50% 50% 50% 0;'+
+      'background:#e8642c;border:2px solid #fff;transform:rotate(-45deg);'+
+      'box-shadow:0 2px 6px rgba(0,0,0,.4);"></div>',
+  });
+
+  async function geocode(query){
+    if(geoCache[query] !== undefined) return geoCache[query];
+    try{
+      const r = await fetch('/api/geocode?q=' + encodeURIComponent(query));
+      const j = r.ok ? await r.json() : null;
+      geoCache[query] = j;
+      return j;
+    }catch(e){ geoCache[query] = null; return null; }
+  }
+
+  function googleLink(query){
+    return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(query);
+  }
+
+  async function loadLocation(loc, chipId){
+    picker.querySelectorAll('.mapChip').forEach(c => c.classList.toggle('active', c.dataset.id === chipId));
+    frameEl.innerHTML = '<div style="padding:16px;color:#888;">Locating…</div>';
+    const hit = await geocode(loc.geoQuery || loc.query);
+    dropPin = null; // the map instance below is fresh, so any previous drop-pin marker is already gone with it
+    frameEl.innerHTML =
+      '<div id="mapCanvas" style="width:100%;height:100%;"></div>'+
+      '<a id="mapStreetViewLink" href="'+googleLink(loc.query)+'" target="_blank" rel="noopener" '+
+        'style="position:absolute;top:10px;right:10px;z-index:1000;background:#fff;border-radius:8px;padding:8px 12px;font-size:0.8rem;font-weight:700;color:#1a5a8a;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.25);">'+
+        '📍 Open in Google Maps (Street View) ↗</a>';
+    frameEl.style.position = 'relative';
+    if(!hit){
+      document.getElementById('mapCanvas').outerHTML =
+        '<div style="padding:16px;color:#888;">Could not pin this on the map automatically — use the Google Maps link above.</div>';
+      return;
+    }
+    map = L.map('mapCanvas').setView([hit.lat, hit.lon], 16);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(map);
+    marker = L.marker([hit.lat, hit.lon]).addTo(map).bindPopup(escapeHtml(loc.label));
+
+    // Click anywhere on the map to drop a pin there and repoint the Street
+    // View link at that exact spot — Google's real draggable Pegman needs
+    // a billed Maps JS API key we don't have, so this is the free equivalent.
+    map.on('click', e => {
+      if(dropPin) dropPin.setLatLng(e.latlng);
+      else dropPin = L.marker(e.latlng, {icon: dropIcon}).addTo(map);
+      const link = document.getElementById('mapStreetViewLink');
+      if(link){
+        link.href = googleLink(e.latlng.lat.toFixed(6) + ',' + e.latlng.lng.toFixed(6));
+        link.textContent = '📍 Open dropped pin in Google Maps (Street View) ↗';
+      }
+    });
+  }
+
+  picker.innerHTML = LOCATIONS.map(l => '<button class="mapChip" data-id="'+l.id+'">'+escapeHtml(l.label)+'</button>').join('');
+  picker.querySelectorAll('.mapChip').forEach((c, i) => c.onclick = () => loadLocation(LOCATIONS[i], LOCATIONS[i].id));
+  loadLocation(LOCATIONS[0], LOCATIONS[0].id);
+
+  // 📍 buttons in the wall's detail panel — delegated since the panel's
+  // content is rebuilt fresh on every openDetail() call
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-maploc]');
+    if(!btn) return;
+    const query = btn.dataset.maploc;
+    const matched = LOCATIONS.find(l => l.query === query) || { id:null, label:query, query };
+    loadLocation(matched, matched.id);
+    if(typeof closeDetail === 'function') closeDetail();
+    const sec = document.getElementById('mapSection');
+    if(sec) sec.scrollIntoView({behavior:'smooth'});
+  });
+})();
+</script>
+</body>
+</html>

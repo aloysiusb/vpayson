@@ -194,6 +194,11 @@ section{padding-block:clamp(2.75rem,7vh,4.5rem)}
 }
 .app-links a:hover,.app-links a:focus-visible{color:var(--accent)}
 
+/* Described, never linked. The live instance of this one holds private case
+   material, so the card carries the work and no destination — and must not
+   lift or glow as though there were something to click. */
+.app-unlinked:hover,.app-unlinked:focus-within{border-color:var(--rule); transform:none}
+
 /* ──────────────────────────────  WORK  ────────────────────────── */
 .work{display:grid; border-block-start:1px solid var(--rule)}
 .item{
@@ -349,6 +354,29 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
         <span class="stack">Single-file HTML &middot; CSS custom properties &middot; drag layout &middot; zones and clusters &middot; no framework</span>
         <span class="cta">Open the board &rarr;</span>
       </a>
+
+      <div class="app app-unlinked">
+        <span class="tag">Research tool &mdash; private deployment</span>
+        <h3>Case documentation wall</h3>
+        <p>The investigation wall taken further, for a working legal matter.
+           The board gained a server — Express and Node's built-in SQLite, no
+           other dependencies — so edits sync across browsers and devices,
+           keep their last fifty versions, and any version can be restored.
+           The page scrolls through four sections: the board, a map, a video
+           desk, and a live news map.</p>
+        <p>The mapping is all OpenStreetMap and Leaflet with no API key
+           anywhere: addresses resolve through a small Nominatim proxy, and a
+           node can be filled with a photo, a live map of a place, or a looping
+           video instead of a label. The news map is the part worth looking at —
+           it reads news feeds, places each story at the region it is actually
+           about using a hand-built gazetteer, and gives every story its own
+           hue from a hash of its title, with markers spread on a spiral so
+           overlapping ones stay separable. The video desk pages a channel feed
+           through RSS and oEmbed, which keeps it free of quota and of keys.</p>
+        <p>Not linked, and deliberately: the live board holds case documents
+           that are nobody else's business. Happy to walk through it directly.</p>
+        <span class="stack">Express &middot; node:sqlite &middot; Leaflet + OSM &middot; Nominatim &middot; RSS and oEmbed &middot; 14 node types &middot; no API keys</span>
+      </div>
 
       <a class="app" href="palette/">
         <span class="tag">Design tool</span>

@@ -6,6 +6,7 @@ dependencies, no framework. Auto-deploys to Render on every push to `main`.
 ```
 index.html                       home — Applications, then Selected work
 settings.html                    re-tone the site: hue, chroma, accent, typeface
+resonance/index.html             Resonance Engine — a server-free copy (see below)
 palette/                         Color Theory Wheel + Golden Section Palette
 work/evergreen/index.html        route driver app — case study
 work/evergreen/walkthrough.html  the interactive demo
@@ -57,6 +58,25 @@ on 2026-10-13, the **live** Lemmon Docière (links straight to
 the-lemmon-dociere.onrender.com, which has no password — visitors can edit the
 real board; its last 50 versions are restorable). That was a deliberate choice
 over a read-only copy; do not silently swap it.
+
+## The Resonance Engine is a copy too, and it needs no server
+
+`resonance/index.html` was copied out of the `cymatic-decoder` repo
+(`app/static/resonance-engine.html`) so the page could outlive that service.
+**It makes zero network calls** — no `fetch`, no WebSocket. The synthesis is
+Web Audio, the water cymatics are a WebGL shader, and the mode arithmetic is in
+the page. Keep it that way.
+
+One thing was removed in the copy: the **Decode a pattern** view, the only part
+that needed the Python backend (`POST /analyze` — polar-FFT symmetry detection
+in NumPy/Pillow, which has no browser equivalent here). Taken out were the menu
+entry, the `<section id="decode">`, the `#decode:target` view-switch rules and
+the decode JS block. The shared classes it used (`.p-card` and friends) stay,
+because the engine's own profile cards use them.
+
+If you re-copy the file from the app, redo that removal, and re-check for
+`fetch(` before publishing. The decode feature still exists in the
+`cymatic-decoder` repo and still works there, if that service is running.
 
 ## Deploying to Render
 

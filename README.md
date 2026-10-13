@@ -50,9 +50,13 @@ item below.
 - [ ] **RISD** is deliberately not cited in the hero strip for now. The original
       wording is in an HTML comment there if it should go back.
 
-Not for public listing: the investigative wall projects (BAM, Apostasy, the
-Lemmon docket, the case reference tracker). Confidential case documentation —
-describe the capability if useful, but do not link them.
+Not for public listing: Apostasy and the case reference tracker. Confidential
+case documentation — describe the capability if useful, but do not link them.
+The owner chose to list the BAM wall (a copy, `work/investigation-wall/`) and,
+on 2026-10-13, the **live** Lemmon Docière (links straight to
+the-lemmon-dociere.onrender.com, which has no password — visitors can edit the
+real board; its last 50 versions are restorable). That was a deliberate choice
+over a read-only copy; do not silently swap it.
 
 ## Deploying to Render
 

@@ -420,17 +420,19 @@ footer a{color:var(--brand); text-underline-offset:.2em; text-decoration-thickne
         </div>
       </div>
 
-      <a class="app" href="https://cymatic-decoder.onrender.com/resonance">
+      <a class="app" href="resonance/">
         <span class="tag">Sound</span>
         <h3>Resonance Engine</h3>
         <p>Play a frequency and watch it take shape. Tones are tuned to A432 and
            drawn as water cymatics in WebGL, the surface tinted by that tone's own
            colour octave. The harp voice is a plucked string modelled note by note
-           rather than a sample, so it rings and decays like the real thing. Every
-           pitch is mapped against its musical note, brainwave band and colour —
-           and it runs backwards too: give it a photo of a Chladni pattern and it
-           returns the frequencies that would produce it.</p>
-        <span class="stack">Web Audio API &middot; WebGL &middot; Karplus&ndash;Strong synthesis &middot; Python / FastAPI backend</span>
+           rather than a sample, so it rings and decays like the real thing, and
+           every pitch is mapped against its musical note, brainwave band and
+           colour.</p>
+        <p>It runs with no server behind it at all — the synthesis, the shader and
+           the mode arithmetic are all in the page, so it still plays years from
+           now with nothing upstream alive.</p>
+        <span class="stack">Web Audio API &middot; WebGL &middot; Karplus&ndash;Strong synthesis &middot; no backend, no dependencies</span>
         <span class="cta">Play it &rarr;</span>
       </a>
 
